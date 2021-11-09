@@ -1,0 +1,24 @@
+# 忽略.vscode文件夹
+.vscode/
+.VSCodeCounter
+
+# 忽略工作区文件
+*.code-workspace
+
+# 忽略python缓存文件
+*/__pycache__
+*.py[cod]
+
+# 忽略日志文件
+log/
+*.log
+
+# 忽略测试文件
+test.py
+demo.py
+
+# 忽略备份文件夹
+backup/
+
+# 忽略预训练的 vgg16 权重文件
+model/vgg16-397923af.pth
