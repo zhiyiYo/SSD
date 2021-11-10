@@ -1,9 +1,12 @@
 # coding:utf-8
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.nn import functional as F
+from torch.nn import init
 from torchvision.models.utils import load_state_dict_from_url
-from l2norm import L2Norm
+
+from .detector import Detector
+from .prior_box import PriorBox
 
 
 def vgg16(pretrained=False, batch_norm=False) -> nn.ModuleList:
@@ -60,18 +63,70 @@ def vgg16(pretrained=False, batch_norm=False) -> nn.ModuleList:
     return layers
 
 
+class L2Norm(nn.Module):
+    """ L2 标准化 """
+
+    def __init__(self, n_channels: int, scale):
+        """
+        Parameters
+        ----------
+        n_channels: int
+            通道数
+
+        scale: float
+            l2标准化的缩放比
+        """
+        super().__init__()
+        self.gamma = scale
+        self.eps = 1e-10
+        self.n_channels = n_channels
+        self.weight = nn.Parameter(Tensor(self.n_channels))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.constant_(self.weight, self.gamma)
+
+    def forward(self, x: Tensor):
+        norm = x.pow(2).sum(dim=1, keepdim=True).sqrt()+self.eps
+        x /= norm
+        # 将 weight 的维度变为 [1, n_channels, 1, 1]
+        x *= self.weight[None, ..., None, None]
+        return x
+
+
 class SSD(nn.Module):
     """ SSD 神经网络模型 """
 
-    def __init__(self, n_classes: int):
+    def __init__(self, n_classes: int, variance=(0.1, 0.2), top_k=200, conf_thresh=0.01, nms_thresh=0.45):
         """
         Parameters
         ----------
         n_classes: int
             要预测的种类数，包括背景
+
+        variance: Tuple[float, float]
+            先验框的方差
+
+        top_k: int
+            每个类的边界框上限
+
+        conf_thresh: float
+            置信度阈值
+
+        nms_thresh: float
+            nms 中 IOU 阈值
         """
         super().__init__()
+
+        if len(variance) != 2:
+            raise ValueError("variance 只能有 2 元素")
+
         self.n_classes = n_classes
+        self.priorbox_generator = PriorBox()
+        self.prior = Tensor(self.priorbox_generator())
+        self.detector = Detector(
+            n_classes, variance, top_k, conf_thresh, nms_thresh)
+
         self.vgg16 = vgg16()
         self.l2norm = L2Norm(512, 20)
         self.extras = nn.ModuleList([
@@ -102,10 +157,27 @@ class SSD(nn.Module):
             nn.Conv2d(256, 4*4, 3, padding=1),
         ])
 
-    def forward(self, x: torch.Tensor):
-        sources = []
-        conf = []
+    def forward(self, x: Tensor):
+        """
+        Parameters
+        ----------
+        x: Tensor of shape `(N, 3, H, W)`
+            图像数据
+
+        Returns
+        -------
+        loc: Tensor of shape `(N, n_priors, 4)`
+            偏移量
+
+        conf: Tensor of shape `(N, n_priors, n_classes)`
+            每个先验框中的类别置信度
+
+        prior: Tensor of shape `(n_priors, 4)`
+            先验框
+        """
         loc = []
+        conf = []
+        sources = []
 
         # 批大小
         N = x.size(0)
@@ -114,7 +186,7 @@ class SSD(nn.Module):
         for layer in self.vgg16[:23]:
             x = layer(x)
 
-        # 保存 conv4_3 输出的 l2 正则化结果
+        # 保存 conv4_3 输出的 l2 标准化结果
         sources.append(self.l2norm(x))
 
         # 计算 vgg16 后面几个卷积层的特征图
@@ -132,19 +204,27 @@ class SSD(nn.Module):
 
         # 使用分类器和探测器进行预测并将通道变为最后一个维度方便堆叠
         for x, conf_layer, loc_layer in zip(sources, self.confs, self.locs):
-            conf.append(conf_layer(x).permute(0, 2, 3, 1).contiguous())
             loc.append(loc_layer(x).permute(0, 2, 3, 1).contiguous())
+            conf.append(conf_layer(x).permute(0, 2, 3, 1).contiguous())
 
         # 输出维度为 (batch_size, 8732, n_classes) 和 (batch_size, 8732, 4)
         conf = torch.cat([i.view(N, -1) for i in conf], dim=1)
         loc = torch.cat([i.view(N, -1) for i in loc], dim=1)
 
-        return conf.view(N, -1, self.n_classes), loc.view(N, -1, 4)
+        return loc.view(N, -1, 4), conf.view(N, -1, self.n_classes),  self.prior
 
+    def predict(self, x: Tensor):
+        """
+        Parameters
+        ----------
+        x: Tensor of shape `(N, 3, H, W)`
+            图像数据
 
-if __name__ == '__main__':
-    model = SSD(10).cuda()
-    x = torch.rand((1, 3, 300, 300)).cuda()
-    conf, loc = model(x)
-    print('conf.size: ', conf.size())
-    print('loc.size: ', loc.size())
+        Returns
+        -------
+        out: Tensor of shape `(N, n_classes, top_k, 5)`
+            检测结果，最后一个维度的前四个元素为边界框的坐标 `(xmin, ymin, xmax, ymax)`，最后一个元素为置信度
+        """
+        loc, conf, prior = self(x)
+        out = self.detector(loc, F.softmax(conf, dim=1), prior)
+        return out

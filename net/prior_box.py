@@ -28,24 +28,30 @@ class PriorBox:
         }
         self.config.update(config)
 
-        self.aspect_ratios = self.config['aspect_ratios']   # 宽高比的种类
-        self.feature_maps = self.config['feature_maps']     # 特征图大小
-        self.image_size = self.config['image_size']  # 图像大小
-        self.n_classes = self.config['n_classes']   # 类别数，包括背景
-        self.min_sizes = self.config['min_sizes']   # s_k
-        self.max_sizes = self.config['max_sizes']   # s_(k+1)
+        self.aspect_ratios = self.config['aspect_ratios']  # 宽高比的种类
+        self.feature_maps = self.config['feature_maps']    # 特征图大小
+        self.image_size = self.config['image_size']        # 图像大小
+        self.n_classes = self.config['n_classes']          # 类别数，包括背景
+        self.min_sizes = self.config['min_sizes']          # s_k*image_size
+        self.max_sizes = self.config['max_sizes']          # s_(k+1)*image_size
         self.variance = self.config['variance']
         self.steps = self.config["steps"]           # 原图尺寸/特征图尺寸，可理解为感受野
 
     def __call__(self):
-        """ 得到所有先验框 """
+        """ 得到所有先验框
+
+        Returns
+        -------
+        boxes: Tensor of shape (n_anchors, 4)
+            先验框
+        """
         boxes = []
 
         for k, f in enumerate(self.feature_maps):
             f_k = self.image_size / self.steps[k]
 
             for i, j in product(range(f), repeat=2):
-                # 中心坐标，向下为 x 轴正方向，向右为 y 轴正方向
+                # 中心坐标，向右为 x 轴正方向，向下为 y 轴正方向
                 cx = (j+0.5) / f_k
                 cy = (i+0.5) / f_k
 
