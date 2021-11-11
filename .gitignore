@@ -22,3 +22,8 @@ backup/
 
 # 忽略预训练的 vgg16 权重文件
 model/vgg16-397923af.pth
+
+# 忽略数据集
+*.tar
+VOCtest_06-Nov-2007
+VOCtrainval_06-Nov-2007

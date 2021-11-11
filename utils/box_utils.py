@@ -1,6 +1,13 @@
 # coding: utf-8
+from typing import Union
+from itertools import cycle
+
+import numpy as np
 import torch
+from numpy import ndarray
 from torch import Tensor
+
+from PIL import Image, ImageDraw, ImageFont, ImageColor
 
 
 def log_sum_exp(x: Tensor):
@@ -54,7 +61,38 @@ def jaccard_overlap(prior: Tensor, bbox: Tensor):
     return inter/(area_prior+area_bbox-inter)
 
 
-def center_to_conner(boxes: Tensor):
+def jaccard_overlap_numpy(box: np.ndarray, boxes: np.ndarray):
+    """ 计算一个边界框和其他边界框的交并比
+
+    Parameters
+    ----------
+    box: `~np.ndarray` of shape `(4, )`
+        边界框
+
+    boxes: `~np.ndarray` of shape `(n, 4)`
+        其他边界框
+
+    Returns
+    -------
+    iou: `~np.ndarray` of shape `(n, )`
+        交并比
+    """
+    # 计算交集
+    xy_max = np.minimum(boxes[:, 2:], box[2:])
+    xy_min = np.maximum(boxes[:, :2], box[:2])
+    inter = np.clip(xy_max-xy_min, a_min=0, a_max=np.inf)
+    inter = inter[:, 0]*inter[:, 1]
+
+    # 计算并集
+    area_boxes = (boxes[:, 2]-boxes[:, 0])*(boxes[:, 3]-boxes[:, 1])
+    area_box = (box[2]-box[0])*(box[3]-box[1])
+
+    # 计算 iou
+    iou = inter/(area_box+area_boxes+inter)  # type: np.ndarray
+    return iou
+
+
+def center_to_corner(boxes: Tensor):
     """ 将 `(cx, cy, w, h)` 形式的边界框变换为 `(xmin, ymin, xmax, ymax)` 形式的边界框
 
     Parameters
@@ -65,7 +103,7 @@ def center_to_conner(boxes: Tensor):
     return torch.cat((boxes[:, :2]-boxes[:, 2:]/2, boxes[:, :2]+boxes[:, 2:]/2), dim=1)
 
 
-def conner_to_center(boxes: Tensor):
+def corner_to_center(boxes: Tensor):
     """ 将 `(xmin, ymin, xmax, ymax)` 形式的边界框变换为 `(cx, cy, w, h)` 形式的边界框
 
     Parameters
@@ -95,7 +133,7 @@ def encode(prior: Tensor, matched_bbox: Tensor, variance: tuple):
     g: Tensor of shape `(n_priors, 4)`
         编码后的偏置量
     """
-    matched_bbox = conner_to_center(matched_bbox)
+    matched_bbox = corner_to_center(matched_bbox)
     g_cxcy = (matched_bbox[:, :2]-prior[:, :2]) / (variance[0]*prior[:, 2:])
     g_wh = torch.log(matched_bbox[:, 2:]/prior[:, 2:]+1e-5) / variance[1]
     return torch.cat((g_cxcy, g_wh), dim=1)
@@ -123,7 +161,7 @@ def decode(loc: Tensor, prior: Tensor, variance: tuple):
     bbox = torch.cat((
         prior[:, :2] + prior[:, 2:] * variance[0] * loc[:, :2],
         prior[:, 2:] * torch.exp(variance[1] * loc[:, 2:])), dim=1)
-    bbox = center_to_conner(bbox)
+    bbox = center_to_corner(bbox)
     return bbox
 
 
@@ -155,7 +193,7 @@ def match(overlap_thresh: float, prior: Tensor, bbox: Tensor, variance: tuple, l
     conf: Tensor of shape `(n_priors, )`
         先验框中的物体所属的类
     """
-    iou = jaccard_overlap(center_to_conner(prior), bbox)
+    iou = jaccard_overlap(center_to_corner(prior), bbox)
 
     # 获取和每个边界框匹配地最好的先验框的 iou 和索引，返回值形状 (n_objects, )
     best_prior_iou, best_prior_index = iou.max(dim=0)
@@ -240,3 +278,53 @@ def nms(boxes: Tensor, scores: Tensor, overlap_thresh=0.5, top_k=200):
         indexes = indexes[iou < overlap_thresh]
 
     return torch.LongTensor(keep, device=scores.device)
+
+
+def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf: ndarray = None) -> Image.Image:
+    """ 在图像上绘制边界框和标签
+
+    Parameters
+    ----------
+    image: `~np.ndarray` of shape `(H, W, 3)` or `~PIL.Image.Image`
+        RGB 图像
+
+    bbox: `~np.ndarray` of shape `(n_objects, 4)`
+        边界框
+
+    label: Iterable of shape `(n_objects, )`
+        标签
+
+    conf: Iterable of shape `(n_objects, )`
+        置信度
+    """
+    bbox = bbox.astype(np.int)
+
+    if isinstance(image, ndarray):
+        image = Image.fromarray(image)  # type:Image.Image
+
+    image_draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype('./msyh.ttc', size=15)
+    colors = cycle([
+        '#0072BD', '#D95319', '#EDB120',
+        '#7E2F8E', '#77AC30', '#4DBEEE',
+        '#A2142F', '#7F7F7F', '#BCBD22', '#17BECF'
+    ])
+
+    for i in range(bbox.shape[0]):
+        x1, y1, x2, y2 = bbox[i]
+
+        color = next(colors)
+
+        # 绘制方框
+        image_draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
+
+        # 绘制标签
+        y1_ = y1 if y1-26 < 0 else y1-26
+        y2_ = y1 if y1_ < y1 else y1+26
+        text = label[i] if conf is None else f'{label[i]} | {conf[i]}'
+        l = font.getlength(text) + 3
+        image_draw.rectangle([x1, y1_, x1+l, y2_], fill=color)
+        image_draw.text([x1+2, y1_+2], text=text,
+                        font=font, embedded_color=color)
+
+    return image
