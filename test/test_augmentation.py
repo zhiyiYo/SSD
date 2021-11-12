@@ -20,13 +20,19 @@ class TestAugmentation(unittest.TestCase):
         """ 测试随机翻转 """
         self.dataset.transformer = Compose(
             [BBoxToAbsoluteCoords(), RandomFlip()])
-        image, target = self.dataset[8]
+        image, target = self.dataset[4]
         self.draw(image, target)
 
     def test_random_crop(self):
         """ 测试随机裁剪 """
         self.dataset.transformer = Compose(
             [BBoxToAbsoluteCoords(), RandomSampleCrop()])
+        image, target = self.dataset[6]
+        self.draw(image, target)
+
+    def test_resize(self):
+        self.dataset.transformer = Compose(
+            [Resize((500, 500)), BBoxToAbsoluteCoords()])
         image, target = self.dataset[6]
         self.draw(image, target)
 

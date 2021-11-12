@@ -302,8 +302,8 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
     if isinstance(image, ndarray):
         image = Image.fromarray(image)  # type:Image.Image
 
-    image_draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype('./msyh.ttc', size=15)
+    image_draw = ImageDraw.Draw(image, 'RGBA')
+    font = ImageFont.truetype('./msyh.ttc', size=13)
     colors = cycle([
         '#0072BD', '#D95319', '#EDB120',
         '#7E2F8E', '#77AC30', '#4DBEEE',
@@ -319,11 +319,11 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         image_draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
 
         # 绘制标签
-        y1_ = y1 if y1-26 < 0 else y1-26
-        y2_ = y1 if y1_ < y1 else y1+26
+        y1_ = y1 if y1-23 < 0 else y1-23
+        y2_ = y1 if y1_ < y1 else y1+23
         text = label[i] if conf is None else f'{label[i]} | {conf[i]}'
         l = font.getlength(text) + 3
-        image_draw.rectangle([x1, y1_, x1+l, y2_], fill=color)
+        image_draw.rectangle([x1, y1_, x1+l, y2_], fill=color+'75', outline=color+'DD')
         image_draw.text([x1+2, y1_+2], text=text,
                         font=font, embedded_color=color)
 

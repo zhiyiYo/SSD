@@ -1,5 +1,5 @@
 # coding:utf-8
-from typing import Tuple
+from typing import Tuple, List
 
 import torch
 from torch import nn
@@ -9,10 +9,10 @@ from torch.nn import functional as F
 from utils.box_utils import match, log_sum_exp
 
 
-class MultiBoxLoss(nn.Module):
+class SSDLoss(nn.Module):
     """ 损失函数 """
 
-    def __init__(self, n_classes: int, variance=(0.1, 0.2), overlap_thresh=0.5, neg_pos_ratio=3, use_gpu=True):
+    def __init__(self, n_classes: int, variance=(0.1, 0.2), overlap_thresh=0.5, neg_pos_ratio=3, use_gpu=True, **kwargs):
         """
         Parameters
         ----------
@@ -42,7 +42,7 @@ class MultiBoxLoss(nn.Module):
         self.neg_pos_ratio = neg_pos_ratio
         self.overlap_thresh = overlap_thresh
 
-    def forward(self, pred: Tuple[Tensor, Tensor, Tensor], target: Tensor):
+    def forward(self, pred: Tuple[Tensor, Tensor, Tensor], target: List[Tensor]):
         """ 计算损失
 
         Parameters
@@ -50,8 +50,8 @@ class MultiBoxLoss(nn.Module):
         pred: Tuple[Tensor]
             SSD 网络的预测结果
 
-        target: Tensor of shape (N, n_objects, 5)
-            标签，包含边界框位置和类别，每张图中可能不止有一个目标
+        target: list of shape `(N, )`
+            标签列表，每个标签的形状为 `(n_objects, 5)`，包含边界框位置和类别，每张图中可能不止有一个目标
         """
         loc_pred, conf_pred, prior = pred
         N = conf_pred.size(0)

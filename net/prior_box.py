@@ -12,14 +12,13 @@ class PriorBox:
         """
         Parameters
         ----------
-        config:
-            用户自定义 VOC 数据集的配置
+        **config:
+            用户自定义的配置
         """
         # 默认配置
         self.config = {
-            'n_classes': 21,
             "image_size": 300,
-            'variance': [0.1, 0.2],
+            'variance': (0.1, 0.2),
             'steps': [8, 16, 32, 64, 100, 300],
             'feature_maps': [38, 19, 10, 5, 3, 1],
             'min_sizes': [30, 60, 111, 162, 213, 264],
@@ -31,7 +30,6 @@ class PriorBox:
         self.aspect_ratios = self.config['aspect_ratios']  # 宽高比的种类
         self.feature_maps = self.config['feature_maps']    # 特征图大小
         self.image_size = self.config['image_size']        # 图像大小
-        self.n_classes = self.config['n_classes']          # 类别数，包括背景
         self.min_sizes = self.config['min_sizes']          # s_k*image_size
         self.max_sizes = self.config['max_sizes']          # s_(k+1)*image_size
         self.variance = self.config['variance']

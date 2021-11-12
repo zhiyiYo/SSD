@@ -1,4 +1,5 @@
 # coding:utf-8
+from typing import List, Tuple
 from os import path
 from typing import Dict
 from xml.etree import ElementTree as ET
@@ -136,7 +137,7 @@ class VOCDataset(Dataset):
         image: Tensor of shape `(3, H, W)`
             增强后的图像数据
 
-        target: of shape `(n_objects, 5)`
+        target: `np.ndarray` of shape `(n_objects, 5)`
             标签数据
         """
         image_path = self.image_paths[index]
@@ -144,7 +145,6 @@ class VOCDataset(Dataset):
 
         # 读入图片和标签数据
         image = cv.cvtColor(cv.imread(image_path), cv.COLOR_BGR2RGB)
-        print(image)
         target = np.array(self.annotation_transformer(annotation_path))
         bbox, label = target[:, :4], target[:, -1]
 
@@ -154,3 +154,31 @@ class VOCDataset(Dataset):
             target = np.hstack((bbox, label[:, np.newaxis]))
 
         return torch.from_numpy(image.astype(np.uint8)).permute(2, 0, 1), target
+
+
+def collate_fn(batch: List[Tuple[torch.Tensor, np.ndarray]]):
+    """ 整理 dataloader 取出的数据
+
+    Parameters
+    ----------
+    batch: list of shape `(N, 2)`
+        一批数据，列表中的每一个元组包括两个元素：
+        * image: Tensor of shape `(3, H, W)`
+        * target: `~np.ndarray` of shape `(n_objects, 5)`
+
+    Returns
+    -------
+    image: Tensor of shape `(N, 3, H, W)`
+        图像
+
+    target: List[Tensor]
+        标签
+    """
+    images = []
+    targets = []
+
+    for img, target in batch:
+        images.append(img.to(torch.float32))
+        targets.append(torch.Tensor(target))
+
+    return torch.stack(images, 0), targets

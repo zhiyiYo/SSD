@@ -2,7 +2,7 @@
 import unittest
 
 import torch
-from net import MultiBoxLoss, SSD
+from net import SSDLoss, SSD
 
 
 class TestLoss(unittest.TestCase):
@@ -22,7 +22,7 @@ class TestLoss(unittest.TestCase):
         target = torch.cat((bbox, conf.float()), dim=2)
 
         # 损失函数
-        loss = MultiBoxLoss(21)
+        loss = SSDLoss(21)
         loc_loss, class_loss = loss((loc_pred, conf_pred, priors), target)
         print('\n\tloc_loss = ', loc_loss)
         print('\tclass_loss = ', class_loss)

@@ -381,7 +381,7 @@ class Expand(Transformer):
             return image, bbox, label
 
         h, w, c = image.shape
-        ratio = random.uniform(1, 2)
+        ratio = random.uniform(1, 3)
         left = int(random.uniform(0, w*ratio-w))
         top = int(random.uniform(0, h*ratio-h))
 
@@ -406,6 +406,25 @@ class Resize(Transformer):
         self.size = size
 
     def transform(self, image: ndarray, bbox: ndarray, label: ndarray):
+        """ 调整图像大小
+
+        Parameters
+        ----------
+        image: `~np.ndarray` of shape `(H, W, 3)`
+            RGB 图像
+
+        bbox: `~np.ndarray` of shape `(n_objects, 4)`
+            已经归一化的边界框
+
+        label: `~np.ndarray` of shape `(n_objects, )`
+            类别标签
+
+        Returns
+        -------
+        image, bbox, label:
+            增强后的数据
+        """
+        # 归一化后的边界框无需做出任何改变
         return cv.resize(image, self.size), bbox, label
 
 

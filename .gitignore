@@ -20,8 +20,8 @@ demo.py
 # 忽略备份文件夹
 backup/
 
-# 忽略预训练的 vgg16 权重文件
-model/vgg16-397923af.pth
+# 忽略模型文件
+model/
 
 # 忽略数据集
 *.tar

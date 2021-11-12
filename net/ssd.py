@@ -3,20 +3,16 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.nn import init
-from torchvision.models.utils import load_state_dict_from_url
 
 from .detector import Detector
 from .prior_box import PriorBox
 
 
-def vgg16(pretrained=False, batch_norm=False) -> nn.ModuleList:
+def vgg16(batch_norm=False) -> nn.ModuleList:
     """ 创建 vgg16 模型
 
     Parameters
     ----------
-    pretrained: bool
-        是否使用预训练的模型
-
     batch_norm: bool
         是否在卷积层后面添加批归一化层
     """
@@ -52,14 +48,6 @@ def vgg16(pretrained=False, batch_norm=False) -> nn.ModuleList:
 
     layers = nn.ModuleList(layers)
 
-    # 使用预训练的 vgg16
-    if pretrained:
-        state_dict = load_state_dict_from_url(
-            "https://download.pytorch.org/models/vgg16-397923af.pth", './model')
-        state_dict = {k.replace('features.', ''): v for k,
-                      v in state_dict.items()}
-        layers.load_state_dict(state_dict, strict=False)
-
     return layers
 
 
@@ -88,16 +76,16 @@ class L2Norm(nn.Module):
 
     def forward(self, x: Tensor):
         norm = x.pow(2).sum(dim=1, keepdim=True).sqrt()+self.eps
-        x /= norm
+        x = torch.div(x, norm)
         # 将 weight 的维度变为 [1, n_channels, 1, 1]
-        x *= self.weight[None, ..., None, None]
-        return x
+        y = x*self.weight[None, ..., None, None]
+        return y
 
 
 class SSD(nn.Module):
     """ SSD 神经网络模型 """
 
-    def __init__(self, n_classes: int, variance=(0.1, 0.2), top_k=200, conf_thresh=0.01, nms_thresh=0.45):
+    def __init__(self, n_classes: int, variance=(0.1, 0.2), top_k=200, conf_thresh=0.01, nms_thresh=0.45, **config):
         """
         Parameters
         ----------
@@ -115,6 +103,9 @@ class SSD(nn.Module):
 
         nms_thresh: float
             nms 中 IOU 阈值
+
+        **config:
+            关于先验框生成的配置
         """
         super().__init__()
 
@@ -122,12 +113,12 @@ class SSD(nn.Module):
             raise ValueError("variance 只能有 2 元素")
 
         self.n_classes = n_classes
-        self.priorbox_generator = PriorBox()
+        self.priorbox_generator = PriorBox(**config)
         self.prior = Tensor(self.priorbox_generator())
         self.detector = Detector(
             n_classes, variance, top_k, conf_thresh, nms_thresh)
 
-        self.vgg16 = vgg16()
+        self.vgg = vgg16()
         self.l2norm = L2Norm(512, 20)
         self.extras = nn.ModuleList([
             nn.Conv2d(1024, 256, 1),                        # conv8_2
@@ -183,14 +174,14 @@ class SSD(nn.Module):
         N = x.size(0)
 
         # 计算从 conv4_3 输出的特征图
-        for layer in self.vgg16[:23]:
+        for layer in self.vgg[:23]:
             x = layer(x)
 
         # 保存 conv4_3 输出的 l2 标准化结果
         sources.append(self.l2norm(x))
 
         # 计算 vgg16 后面几个卷积层的特征图
-        for layer in self.vgg16[23:]:
+        for layer in self.vgg[23:]:
             x = layer(x)
 
         # 保存 conv7 的输出的特征图
