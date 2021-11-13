@@ -77,6 +77,6 @@ class Detector:
                 # 非极大值抑制，将多余的框滤除
                 indexes = nms(boxes, scores, self.nms_thresh, self.top_k)
                 out[i, c, :len(indexes)] = torch.cat(
-                    (boxes[indexes], (scores[indexes]).unsqueeze(1)), dim=1)
+                    (boxes[indexes], scores[indexes].unsqueeze(1)), dim=1)
 
         return out

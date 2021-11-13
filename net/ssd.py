@@ -1,7 +1,9 @@
 # coding:utf-8
+import os
 from typing import List
 
 import numpy as np
+import cv2 as cv
 import torch
 from PIL import Image
 from torch import Tensor, nn
@@ -229,7 +231,7 @@ class SSD(nn.Module):
             检测结果，最后一个维度的前四个元素为边界框的坐标 `(xmin, ymin, xmax, ymax)`，最后一个元素为置信度
         """
         loc, conf, prior = self(x)
-        out = self.detector(loc, F.softmax(conf, dim=1), prior.to(loc.device))
+        out = self.detector(loc, F.softmax(conf, dim=-1), prior.to(loc.device))
         return out
 
     def detect(self, image_path: str, classes: List[str], conf_thresh=0.6, use_gpu=True) -> Image.Image:
@@ -256,32 +258,20 @@ class SSD(nn.Module):
         """
         if not 0 <= conf_thresh < 1:
             raise ValueError("置信度阈值必须在 [0, 1) 范围内")
+            
+        if not os.path.exists(image_path):
+            raise FileNotFoundError("图片不存在，请检查图片路径！")
 
-        image = Image.open(image_path).convert('RGB')
+        image = cv.imread(image_path)[:, :, ::-1]
+        h, w, _ = image.shape
 
-        # 调整图像大小
-        w, h = image.size
-        w, h = image.size
-        ratio_h = h/self.image_size
-        ratio_w = w/self.image_size
-
-        if ratio_h > ratio_w:
-            h_ = self.image_size
-            w_ = int(w/ratio_h)
-        else:
-            h_ = int(h/ratio_w)
-            w_ = w
-
-        image_ = Image.new(
-            'RGB', (self.image_size, self.image_size), (104, 117, 123))
-        image_.paste(image.resize((w_, h_)))
-
-        image_tensor = ToTensor()(image_).unsqueeze(0)
+        x = cv.resize(image, (300, 300)).astype(np.float32)
+        x = ToTensor()(x).unsqueeze(0)
         if use_gpu:
-            image_tensor = image_tensor.cuda()
+            x = x.cuda()
 
         # 预测边界框和置信度，shape: (n_classes, top_k, 5)
-        y = self.predict(image_tensor)[0]
+        y = self.predict(x)[0]
 
         # 筛选出置信度不小于阈值的预测框
         bbox = []

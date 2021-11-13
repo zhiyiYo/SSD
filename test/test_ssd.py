@@ -11,8 +11,7 @@ class TestSSD(unittest.TestCase):
     def test_forward(self):
         """ 测试前馈过程 """
         ssd = SSD(21, [0.1, 0.2])
-        print(ssd)
-        x = torch.rand(2, 3, 500, 300)
+        x = torch.rand(2, 3, 300, 300)
         loc, conf, priors = ssd(x)
         self.assertEqual(loc.shape, (2, 8732, 4))
         self.assertEqual(conf.shape, (2, 8732, 21))
