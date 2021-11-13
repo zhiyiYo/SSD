@@ -47,15 +47,17 @@ class Downloader:
             print(f'\n✔️  完成下载 {file}')
 
         # 解压文件
-        if unzip:
-            for file in filenames:
-                if not file.endswith('.tar'):
-                    continue
+        if not unzip:
+            return
 
-                print(f'\n正在解压 {file} ...')
-                tar = tarfile.open(file)
-                tar.extractall(file.split('.')[0])
-                print(f'✔️  完成解压 {file}')
+        for file in filenames:
+            if not file.endswith('.tar'):
+                continue
+
+            print(f'\n正在解压 {file} ...')
+            tar = tarfile.open(file)
+            tar.extractall(file.split('.')[0])
+            print(f'✔️  完成解压 {file}')
 
 
 if __name__ == '__main__':

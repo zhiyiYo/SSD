@@ -311,7 +311,10 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
     ])
 
     for i in range(bbox.shape[0]):
-        x1, y1, x2, y2 = bbox[i]
+        x1 = max(0, bbox[i, 0])
+        y1 = max(0, bbox[i, 1])
+        x2 = bbox[i, 2]
+        y2 = bbox[i, 3]
 
         color = next(colors)
 
@@ -321,7 +324,7 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         # 绘制标签
         y1_ = y1 if y1-23 < 0 else y1-23
         y2_ = y1 if y1_ < y1 else y1+23
-        text = label[i] if conf is None else f'{label[i]} | {conf[i]}'
+        text = label[i] if conf is None else f'{label[i]} | {conf[i]:.4f}'
         l = font.getlength(text) + 3
         image_draw.rectangle([x1, y1_, x1+l, y2_],
                              fill=color+'75', outline=color+'DD')

@@ -1,5 +1,5 @@
 # SSD
-An implementation of SSD object detection neural network using PyTorch.
+An implementation of SSD object detection using PyTorch.
 
 ## Quick start
 1. Create virtual environment:
@@ -28,6 +28,17 @@ An implementation of SSD object detection neural network using PyTorch.
     ```shell
     conda activate SSD
     python train.py
+    ```
+
+
+## Test model
+1. Modify the `model_path` and `image_path` in `demo.py`.
+
+2. Display detection results:
+
+    ```shell
+    conda activate SSD
+    python demo.py
     ```
 
 
