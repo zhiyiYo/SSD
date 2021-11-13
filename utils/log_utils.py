@@ -49,7 +49,7 @@ class LossLogger:
         """ 记录一条数据 """
         self.losses.append(self.loss/self.frequency)
         self.loc_losses.append(self.loc_loss/self.frequency)
-        self.conf_losses.append(self.conf_losses/self.frequency)
+        self.conf_losses.append(self.conf_loss/self.frequency)
         self.loss = 0
         self.loc_loss = 0
         self.conf_loss = 0

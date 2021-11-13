@@ -265,10 +265,10 @@ def nms(boxes: Tensor, scores: Tensor, overlap_thresh=0.5, top_k=200):
             break
 
         # 其他的预测框和当前预测框的交集
-        right = x2[indexes].clamp(max=x2[i])
-        left = x1[indexes].clamp(min=x1[i])
-        bottom = y2[indexes].clamp(max=y2[i])
-        top = y1[indexes].clamp(min=y1[i])
+        right = x2[indexes].clamp(max=x2[i].item())
+        left = x1[indexes].clamp(min=x1[i].item())
+        bottom = y2[indexes].clamp(max=y2[i].item())
+        top = y1[indexes].clamp(min=y1[i].item())
         inter = ((right-left)*(bottom-top)).clamp(min=0)
 
         # 计算 iou
@@ -277,7 +277,7 @@ def nms(boxes: Tensor, scores: Tensor, overlap_thresh=0.5, top_k=200):
         # 保留 iou 小于阈值的边界框，自己和自己的 iou 为 1
         indexes = indexes[iou < overlap_thresh]
 
-    return torch.LongTensor(keep, device=scores.device)
+    return torch.LongTensor(keep)
 
 
 def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf: ndarray = None) -> Image.Image:
@@ -323,7 +323,8 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         y2_ = y1 if y1_ < y1 else y1+23
         text = label[i] if conf is None else f'{label[i]} | {conf[i]}'
         l = font.getlength(text) + 3
-        image_draw.rectangle([x1, y1_, x1+l, y2_], fill=color+'75', outline=color+'DD')
+        image_draw.rectangle([x1, y1_, x1+l, y2_],
+                             fill=color+'75', outline=color+'DD')
         image_draw.text([x1+2, y1_+2], text=text,
                         font=font, embedded_color=color)
 

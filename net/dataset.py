@@ -77,6 +77,14 @@ class AnnotationTransformer:
 class VOCDataset(Dataset):
     """ VOC 数据集 """
 
+    classes = [
+        'aeroplane', 'bicycle', 'bird', 'boat',
+        'bottle', 'bus', 'car', 'cat', 'chair',
+        'cow', 'diningtable', 'dog', 'horse',
+        'motorbike', 'person', 'pottedplant',
+        'sheep', 'sofa', 'train', 'tvmonitor'
+    ]
+
     def __init__(self, root: str, image_set: str, tranformer: Transformer = None, keep_difficult=False):
         """
         Parameters
@@ -96,13 +104,6 @@ class VOCDataset(Dataset):
         super().__init__()
         self.root = root
         self.image_set = image_set
-        self.classes = [
-            'aeroplane', 'bicycle', 'bird', 'boat',
-            'bottle', 'bus', 'car', 'cat', 'chair',
-            'cow', 'diningtable', 'dog', 'horse',
-            'motorbike', 'person', 'pottedplant',
-            'sheep', 'sofa', 'train', 'tvmonitor'
-        ]
         self.class_to_index = {c: i for i, c in enumerate(self.classes)}
         self.transformer = tranformer    # 数据增强器
         self.annotation_transformer = AnnotationTransformer(

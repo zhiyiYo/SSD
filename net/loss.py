@@ -78,7 +78,7 @@ class SSDLoss(nn.Module):
         # 方框位置损失
         loc_positive = loc_pred[positive_index].view(-1, 4)
         loc_t = loc_t[positive_index].view(-1, 4)
-        loc_loss = F.smooth_l1_loss(loc_positive, loc_t)
+        loc_loss = F.smooth_l1_loss(loc_positive, loc_t, reduction='sum')
 
         # 困难样本挖掘，conf_logP 的 shape: (N*n_priors, 1)
         batch_conf_pred = conf_pred.view(-1, self.n_classes)
@@ -102,7 +102,7 @@ class SSDLoss(nn.Module):
         index = (positive+negative).unsqueeze(2).expand_as(conf_pred).gt(0)
         conf_pred = conf_pred[index].view(-1, self.n_classes)
         conf_t = conf_t[(positive+negative) > 0]
-        conf_loss = F.cross_entropy(conf_pred, conf_t.type(torch.int64))
+        conf_loss = F.cross_entropy(conf_pred, conf_t.type(torch.int64), reduction='sum')
 
         # 将损失除以正样本个数
         n_positive = n_negative.detach().sum()

@@ -1,8 +1,14 @@
 # coding:utf-8
+from typing import List
+
+import numpy as np
 import torch
+from PIL import Image
 from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.nn import init
+from torchvision.transforms import ToTensor
+from utils.box_utils import draw
 
 from .detector import Detector
 from .prior_box import PriorBox
@@ -85,7 +91,8 @@ class L2Norm(nn.Module):
 class SSD(nn.Module):
     """ SSD 神经网络模型 """
 
-    def __init__(self, n_classes: int, variance=(0.1, 0.2), top_k=200, conf_thresh=0.01, nms_thresh=0.45, **config):
+    def __init__(self, n_classes: int, variance=(0.1, 0.2), top_k=200, conf_thresh=0.01,
+                 nms_thresh=0.45, image_size=300, **config):
         """
         Parameters
         ----------
@@ -104,6 +111,9 @@ class SSD(nn.Module):
         nms_thresh: float
             nms 中 IOU 阈值
 
+        image_size: int
+            图像尺寸
+
         **config:
             关于先验框生成的配置
         """
@@ -113,6 +123,8 @@ class SSD(nn.Module):
             raise ValueError("variance 只能有 2 元素")
 
         self.n_classes = n_classes
+        self.image_size = image_size
+        config['image_size'] = image_size
         self.priorbox_generator = PriorBox(**config)
         self.prior = Tensor(self.priorbox_generator())
         self.detector = Detector(
@@ -198,7 +210,7 @@ class SSD(nn.Module):
             loc.append(loc_layer(x).permute(0, 2, 3, 1).contiguous())
             conf.append(conf_layer(x).permute(0, 2, 3, 1).contiguous())
 
-        # 输出维度为 (batch_size, 8732, n_classes) 和 (batch_size, 8732, 4)
+        # 输出维度为 (batch_size, n_priors, n_classes) 和 (batch_size, n_priors, 4)
         conf = torch.cat([i.view(N, -1) for i in conf], dim=1)
         loc = torch.cat([i.view(N, -1) for i in loc], dim=1)
 
@@ -217,5 +229,85 @@ class SSD(nn.Module):
             检测结果，最后一个维度的前四个元素为边界框的坐标 `(xmin, ymin, xmax, ymax)`，最后一个元素为置信度
         """
         loc, conf, prior = self(x)
-        out = self.detector(loc, F.softmax(conf, dim=1), prior)
+        out = self.detector(loc, F.softmax(conf, dim=1), prior.to(loc.device))
         return out
+
+    def detect(self, image_path: str, classes: List[str], conf_thresh=0.6, use_gpu=True) -> Image.Image:
+        """ 检测输入图像中的目标
+
+        Parameters
+        ----------
+        image_path: str
+            图片路径
+
+        classes: List[str]
+            类别列表，不包含背景
+
+        conf_thresh: float
+            置信度阈值，舍弃小于这个阈值的预测框
+
+        use_gpu: bool
+            是否使用 gpu 加速检测
+
+        Returns
+        -------
+        image: `~PIL.Image.Image`
+            绘制了边界框、置信度和类别的图像
+        """
+        if not 0 <= conf_thresh < 1:
+            raise ValueError("置信度阈值必须在 [0, 1) 范围内")
+
+        image = Image.open(image_path).convert('RGB')
+
+        # 调整图像大小
+        w, h = image.size
+        w, h = image.size
+        ratio_h = h/self.image_size
+        ratio_w = w/self.image_size
+
+        if ratio_h > ratio_w:
+            h_ = self.image_size
+            w_ = int(w/ratio_h)
+        else:
+            h_ = int(h/ratio_w)
+            w_ = w
+
+        image_ = Image.new(
+            'RGB', (self.image_size, self.image_size), (104, 117, 123))
+        image_.paste(image.resize((w_, h_)))
+
+        image_tensor = ToTensor()(image_).unsqueeze(0)
+        if use_gpu:
+            image_tensor = image_tensor.cuda()
+
+        # 预测边界框和置信度，shape: (n_classes, top_k, 5)
+        y = self.predict(image_tensor)[0]
+
+        # 筛选出置信度不小于阈值的预测框
+        bbox = []
+        conf = []
+        label = []
+        for c in range(1, y.size(0)):
+            mask = y[c, :, -1] >= conf_thresh
+
+            # 将归一化的边界框还原
+            boxes = y[c, :, :4][mask]
+            boxes[:, [0, 2]] *= w
+            boxes[:, [1, 3]] *= h
+            bbox.append(boxes.detach().numpy())
+
+            conf.extend(y[c, :, -1][mask].tolist())
+            label.extend([classes[c-1]] * mask.sum())
+
+        image = draw(image, np.vstack(bbox), label, conf)
+        return image
+
+    def load(self, model_path: str):
+        """ 载入权重
+
+        Parameters
+        ----------
+        model_path: str
+            模型权重文件路径
+        """
+        self.load_state_dict(torch.load(model_path))

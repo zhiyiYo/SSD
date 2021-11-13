@@ -38,7 +38,7 @@ class TrainPipeline:
 
     def __init__(self, dataset: Dataset, vgg_path: str = None, ssd_path: str = None,
                  lr=0.001, momentum=0.9, weight_decay=5e-4, lr_steps=(40000, 50000, 6000),
-                 batch_size=16, start_iter=0, max_iter=60000, use_gpu=True, save_dir='model',
+                 batch_size=16, start_iter=0, max_iter=60000, save_frequency=2000, use_gpu=True, save_dir='model',
                  log_file: str = None, log_dir='log', **config):
         """
         Parameters
@@ -74,6 +74,9 @@ class TrainPipeline:
 
         max_iter: int
             最多迭代多少次
+
+        save_frequency: int
+            迭代多少次保存一次模型
 
         use_gpu: bool
             是否使用 GPU 加速训练
@@ -120,10 +123,11 @@ class TrainPipeline:
         self.save_dir = save_dir
         self.use_gpu = use_gpu
         self.device = torch.device('cuda:0' if use_gpu else 'cpu')
+        self.save_frequency = save_frequency
         self.batch_size = batch_size
 
         # 一个 epoch 有多少个 batch
-        self.n_batches = math.floor(len(self.dataset)/self.batch_size)+1
+        self.n_batches = math.ceil(len(self.dataset)/self.batch_size)
 
         # 创建模型
         self.model = SSD(**self.config).to(self.device)
@@ -135,10 +139,12 @@ class TrainPipeline:
 
         # 损失函数和优化器
         self.critorion = SSDLoss(**self.config)
-        self.optimizer = optim.SGD(self.model.parameters(), lr,
-                                   momentum, weight_decay=weight_decay)
+        self.optimizer = optim.SGD(
+            [{"params": self.model.parameters(), 'initial_lr': lr}],
+            lr, momentum, weight_decay=weight_decay
+        )
         self.lr_schedule = optim.lr_scheduler.MultiStepLR(
-            self.optimizer, lr_steps, 0.1)
+            self.optimizer, lr_steps, 0.1, last_epoch=start_iter)
 
         # 训练损失记录器
         self.logger = LossLogger(self.n_batches, log_file, log_dir)
@@ -182,8 +188,6 @@ class TrainPipeline:
     @exception_handler
     def train(self):
         """ 训练模型 """
-        torch.autograd.set_detect_anomaly(True)
-
         data_loader = DataLoader(
             self.dataset, self.batch_size, shuffle=True, collate_fn=collate_fn)
         # 无穷迭代器
@@ -192,15 +196,19 @@ class TrainPipeline:
         bar_format = '{desc}{n_fmt:>4s}/{total_fmt:<4s}|{bar}|{postfix}'
         print('🚀 开始训练！')
 
-        with tqdm(total=self.max_iter-self.start_iter, bar_format=bar_format) as bar:
+        with tqdm(total=self.n_batches, bar_format=bar_format) as bar:
             self.model.train()
+            start_time = datetime.now()
 
             for i in range(self.start_iter, self.max_iter):
                 self.current_iter = i
-                if (i-self.start_iter) % self.n_batches == 0:
+                if i > self.start_iter and (i-self.start_iter) % self.n_batches == 0:
                     start_time = datetime.now()
+                    print('')
+                    bar.reset()
 
-                bar.set_description(f"\33[36m🌌 Iteration {i:5d}")
+                e = math.floor((i-self.start_iter)/self.n_batches) + 1
+                bar.set_description(f"\33[36m🌌 Epoch {e:5d}")
 
                 # 取出数据
                 images, targets = next(data_iter)
@@ -218,10 +226,14 @@ class TrainPipeline:
 
                 cost_time = datetime.now() - start_time
                 bar.set_postfix_str(
-                    f'训练损失：{loss.item():.5f}, 执行时间：{cost_time}\33[0m')
+                    f'loss: {loss.item():.3f}, loc_loss: {loc_loss.item():.3f}, conf_loss: {conf_loss.item():.3f}, 执行时间: {cost_time}\33[0m')
                 bar.update()
 
                 # 更新损失
                 self.logger.update(loc_loss.item(), conf_loss.item())
+
+                # 定期保存模型
+                if i > self.start_iter and (i-self.start_iter) % self.save_frequency == 0:
+                    self.save()
 
         self.save()

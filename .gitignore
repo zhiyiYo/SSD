@@ -15,7 +15,6 @@ log/
 
 # 忽略测试文件
 test.py
-demo.py
 
 # 忽略备份文件夹
 backup/
