@@ -303,7 +303,7 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         image = Image.fromarray(image)  # type:Image.Image
 
     image_draw = ImageDraw.Draw(image, 'RGBA')
-    font = ImageFont.truetype('resource/msyh.ttc', size=13)
+    font = ImageFont.truetype('resource/font/msyh.ttc', size=13)
     colors = cycle([
         '#0072BD', '#D95319', '#EDB120',
         '#7E2F8E', '#77AC30', '#4DBEEE',

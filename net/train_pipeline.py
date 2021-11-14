@@ -174,7 +174,7 @@ class TrainPipeline:
         # 保存训练损失数据
         self.logger.save(f'losses_{self.current_iter}')
 
-        print(f'🎉 已将当前模型保存到 {os.path.join(os.getcwd(), path)}')
+        print(f'\n🎉 已将当前模型保存到 {os.path.join(os.getcwd(), path)}')
 
     @staticmethod
     def xavier(module):

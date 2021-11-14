@@ -258,14 +258,14 @@ class SSD(nn.Module):
         """
         if not 0 <= conf_thresh < 1:
             raise ValueError("置信度阈值必须在 [0, 1) 范围内")
-            
+
         if not os.path.exists(image_path):
             raise FileNotFoundError("图片不存在，请检查图片路径！")
 
-        image = cv.imread(image_path)[:, :, ::-1]
-        h, w, _ = image.shape
+        image = Image.open(image_path).convert('RGB')
+        w, h = image.size
 
-        x = cv.resize(image, (300, 300)).astype(np.float32)
+        x = cv.resize(np.array(image), (300, 300)).astype(np.float32)
         x = ToTensor()(x).unsqueeze(0)
         if use_gpu:
             x = x.cuda()
