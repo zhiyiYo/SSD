@@ -105,6 +105,7 @@ class VOCDataset(Dataset):
         self.root = root
         self.image_set = image_set
         self.n_classes = len(self.classes)
+        self.keep_difficult = keep_difficult
         self.class_to_index = {c: i for i, c in enumerate(self.classes)}
         self.transformer = tranformer    # 数据增强器
         self.annotation_transformer = AnnotationTransformer(

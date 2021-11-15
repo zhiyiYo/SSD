@@ -88,7 +88,7 @@ def jaccard_overlap_numpy(box: np.ndarray, boxes: np.ndarray):
     area_box = (box[2]-box[0])*(box[3]-box[1])
 
     # 计算 iou
-    iou = inter/(area_box+area_boxes+inter)  # type: np.ndarray
+    iou = inter/(area_box+area_boxes-inter)  # type: np.ndarray
     return iou
 
 

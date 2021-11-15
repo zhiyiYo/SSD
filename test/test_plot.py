@@ -1,6 +1,6 @@
 # coding:utf-8
 import unittest
-from utils.plot_utils import plot_loss
+from utils.plot_utils import plot_loss, plot_PR
 
 import numpy as np
 import matplotlib as mpl
@@ -15,4 +15,9 @@ class TestPlotUtils(unittest.TestCase):
     def test_plot_loss(self):
         """ 测试损失绘制 """
         fig, ax = plot_loss('log/losses_42514.json')
+        plt.show()
+
+    def test_plot_PR(self):
+        """ 测试损失绘制 """
+        fig, ax = plot_PR('eval/SSD.json', 'cat')
         plt.show()

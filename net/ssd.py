@@ -218,6 +218,7 @@ class SSD(nn.Module):
 
         return loc.view(N, -1, 4), conf.view(N, -1, self.n_classes),  self.prior
 
+    @torch.no_grad()
     def predict(self, x: Tensor):
         """
         Parameters
