@@ -1,6 +1,7 @@
 # coding:utf-8
 import os
-from typing import List
+from typing import List, Union
+from pathlib import Path
 
 import numpy as np
 import cv2 as cv
@@ -235,7 +236,7 @@ class SSD(nn.Module):
         out = self.detector(loc, F.softmax(conf, dim=-1), prior.to(loc.device))
         return out
 
-    def detect(self, image_path: str, classes: List[str], conf_thresh=0.6, use_gpu=True) -> Image.Image:
+    def detect(self, image_path: str, classes: List[str], conf_thresh=0.6, mean=(123, 117, 104), use_gpu=True) -> Image.Image:
         """ 检测输入图像中的目标
 
         Parameters
@@ -248,6 +249,9 @@ class SSD(nn.Module):
 
         conf_thresh: float
             置信度阈值，舍弃小于这个阈值的预测框
+
+        mean: tuple
+            图像中心化时减去的值
 
         use_gpu: bool
             是否使用 gpu 加速检测
@@ -266,7 +270,9 @@ class SSD(nn.Module):
         image = Image.open(image_path).convert('RGB')
         w, h = image.size
 
-        x = cv.resize(np.array(image), (300, 300)).astype(np.float32)
+        size = self.image_size
+        x = np.array(image.resize((size, size)), np.float32)
+        x -= mean
         x = ToTensor()(x).unsqueeze(0)
         if use_gpu:
             x = x.cuda()
@@ -293,12 +299,12 @@ class SSD(nn.Module):
         image = draw(image, np.vstack(bbox), label, conf)
         return image
 
-    def load(self, model_path: str):
+    def load(self, model_path: Union[str, Path]):
         """ 载入权重
 
         Parameters
         ----------
-        model_path: str
+        model_path: str or Path
             模型权重文件路径
         """
         self.load_state_dict(torch.load(model_path))

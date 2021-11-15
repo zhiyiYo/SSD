@@ -63,7 +63,7 @@ class ImageToFloat32(Transformer):
 class Centralization(Transformer):
     """ 图像中心化 """
 
-    def __init__(self, mean=(104, 117, 123)) -> None:
+    def __init__(self, mean=(123, 117, 104)):
         super().__init__()
         self.mean = mean
 

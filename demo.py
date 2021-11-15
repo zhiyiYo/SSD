@@ -3,7 +3,7 @@ from net import SSD, VOCDataset
 
 
 # 模型文件
-model_path = 'model/history/SSD_42514.pth'
+model_path = 'model/SSD.pth'
 image_path = 'resource/image/硝子.png'
 
 # 创建模型

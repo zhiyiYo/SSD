@@ -51,11 +51,12 @@ An implementation of SSD object detection using PyTorch.
     ```
 
 
-## Reference
-* [[Paper] SSD: Single Shot MultiBox Detector](https://arxiv.org/abs/1512.02325)
-* [[GitHub] amdegroot / ssd.pytorch](https://github.com/amdegroot/ssd.pytorch)
-
 ## Notes
 1. Sometimes the data set downloaded through `download.py`' may be incomplete, so please check whether the number of pictures in the data set is correct after downloading, or you can download the data set directly through the browser to the following two addresses:
    * http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
    * http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar
+
+
+## Reference
+* [[Paper] SSD: Single Shot MultiBox Detector](https://arxiv.org/abs/1512.02325)
+* [[GitHub] amdegroot / ssd.pytorch](https://github.com/amdegroot/ssd.pytorch)

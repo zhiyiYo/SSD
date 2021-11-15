@@ -19,10 +19,10 @@ class TestPlotUtils(unittest.TestCase):
 
     def test_plot_PR(self):
         """ 测试 PR 曲线绘制 """
-        fig, ax = plot_PR('eval/SSD.json', 'cat')
+        fig, ax = plot_PR('eval/SSD_AP.json', 'cat')
         plt.show()
 
     def test_plot_AP(self):
         """ 测试 AP 柱状图绘制 """
-        fig, ax = plot_AP('eval/SSD.json')
+        fig, ax = plot_AP('eval/SSD_AP.json')
         plt.show()

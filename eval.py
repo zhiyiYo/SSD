@@ -5,6 +5,6 @@ from net import EvalPipeline, VOCDataset
 root = 'data/VOCtest_06-Nov-2007/VOCdevkit/VOC2007'
 dataset = VOCDataset(root, 'test')
 
-model_path = 'model/history/SSD_42480.pth'
-eval_pipeline = EvalPipeline(model_path, dataset, use_07_metric=False)
+model_path = 'model/SSD.pth'
+eval_pipeline = EvalPipeline(model_path, dataset, conf_thresh=0.6)
 eval_pipeline.eval()

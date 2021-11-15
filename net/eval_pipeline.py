@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Dict
 from xml.etree import ElementTree as ET
 
 import cv2 as cv
@@ -9,8 +10,8 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision.transforms import ToTensor
-
 from utils.box_utils import jaccard_overlap_numpy
+
 from .dataset import VOCDataset
 from .ssd import SSD
 
@@ -18,8 +19,9 @@ from .ssd import SSD
 class EvalPipeline:
     """ 测试模型流水线 """
 
-    def __init__(self, model_path: str, dataset: VOCDataset, image_size=300, conf_thresh=0.6,
-                 overlap_thresh=0.5, save_dir='eval', use_07_metric=False, use_gpu=True):
+    def __init__(self, model_path: str, dataset: VOCDataset, image_size=300, mean=(123, 117, 104),
+                 top_k=200, conf_thresh=0.6, overlap_thresh=0.5, save_dir='eval', use_07_metric=False,
+                 use_gpu=True):
         """
         Parameters
         ----------
@@ -32,6 +34,9 @@ class EvalPipeline:
         image_size: int
             图像尺寸
 
+        mean: tuple
+            图像中心化时所减去的值
+
         conf_thresh: float
             置信度阈值
 
@@ -39,7 +44,7 @@ class EvalPipeline:
             IOU 阈值
 
         save_dir: str
-            测试结果文件的保存目录
+            测试结果和预测结果文件的保存目录
 
         use_07_metric: bool
             是否使用 VOC2007 的 AP 计算方法
@@ -47,17 +52,23 @@ class EvalPipeline:
         use_gpu: bool
             是否使用 GPU
         """
+        self.mean = mean
+        self.top_k = top_k
         self.use_gpu = use_gpu
         self.dataset = dataset
+        self.image_size = image_size
         self.conf_thresh = conf_thresh
         self.overlap_thresh = overlap_thresh
         self.use_07_metric = use_07_metric
-        self.save_dir = save_dir
-        self.image_size = image_size
+        self.save_dir = Path(save_dir)
 
-        self.model_path = model_path
+        self.model_path = Path(model_path)
         self.device = 'cuda:0' if use_gpu else 'cpu'
-        self.model = SSD(self.dataset.n_classes+1, image_size=image_size)
+        self.model = SSD(
+            self.dataset.n_classes+1,
+            top_k=top_k,
+            image_size=image_size
+        )
         self.model = self.model.to(self.device)
         self.model.load(model_path)
         self.model.eval()
@@ -71,6 +82,14 @@ class EvalPipeline:
 
     def _predict(self):
         """ 预测每一种类存在于哪些图片中 """
+        suffix = f'_topk{self.top_k}_conf{self.conf_thresh}_iou{self.overlap_thresh}_pred.json'
+        p = self.save_dir/(self.model_path.stem + suffix)
+        if p.exists():
+            print(f'🛸 从 {p} 中取得预测数据')
+            with open(p, encoding='utf-8') as f:
+                self.preds = json.load(f)
+                return
+
         self.preds = {c: {} for c in self.dataset.classes}
 
         print('🛸 正在预测中...')
@@ -82,6 +101,7 @@ class EvalPipeline:
             x = Image.open(image_path).convert('RGB')
             w, h = x.size
             x = np.array(x.resize((size, size)), np.float32)
+            x -= self.mean
             x = ToTensor()(x).unsqueeze(0).to(self.device)
 
             # 预测
@@ -96,17 +116,22 @@ class EvalPipeline:
                     continue
 
                 # 筛选出满足阈值条件的边界框
-                conf = y[:, -1][mask]
-                bbox = y[:, :4][mask]
+                conf = y[:, -1][mask]  # type:np.ndarray
+                bbox = y[:, :4][mask]  # type:np.ndarray
                 bbox[:, [0, 2]] *= w
                 bbox[:, [1, 3]] *= h
                 bbox += 1
 
                 # 保存预测结果
                 self.preds[c][image_name] = {
-                    "bbox": bbox,
-                    "conf": conf
+                    "bbox": bbox.tolist(),
+                    "conf": conf.tolist()
                 }
+
+        # 缓存数据
+        self.save_dir.mkdir(exist_ok=True)
+        with open(p, 'w', encoding='utf-8') as f:
+            json.dump(self.preds, f)
 
     def _get_ground_truth(self):
         """ 获取 ground truth 中每一种类存在于哪些图片中 """
@@ -146,7 +171,7 @@ class EvalPipeline:
         """ 计算 mAP """
         result = {}
 
-        print('\n🧪 正在计算 AP 中...')
+        print('\n\n🧪 正在计算 AP 中...')
         mAP = 0
         for c in self.dataset.classes:
             ap, precision, recall = self._get_AP(c)
@@ -162,8 +187,8 @@ class EvalPipeline:
         print(f'mAP of {self.model_path}: {mAP:.2%}')
 
         # 保存统计结果
-        os.makedirs(self.save_dir, exist_ok=True)
-        p = Path(self.save_dir) / (Path(self.model_path).stem + '.json')
+        self.save_dir.mkdir(exist_ok=True)
+        p = self.save_dir / (self.model_path.stem + '_AP.json')
         with open(p, 'w', encoding='utf-8') as f:
             json.dump(result, f)
 
@@ -227,7 +252,8 @@ class EvalPipeline:
 
             bbox_pred = bbox[i]  # shape:(4, )
             bbox_gt = np.array(record['bbox'])  # shape:(n, 4)
-            n_positives += bbox_gt.shape[0]
+            difficult = np.array(record['difficult'], np.bool)  # shape:(n, )
+            n_positives += np.sum(~difficult)
 
             # 计算交并比
             iou = jaccard_overlap_numpy(bbox_pred, bbox_gt)
@@ -256,7 +282,7 @@ class EvalPipeline:
             prec = np.concatenate(([0.], precision, [0.]))
 
             # 计算 PR 曲线的包络线
-            for i in range(prec.shape[0]-1, 0, -1):
+            for i in range(prec.size-1, 0, -1):
                 prec[i - 1] = np.maximum(prec[i - 1], prec[i])
 
             # 找出 recall 变化时的索引
@@ -268,6 +294,6 @@ class EvalPipeline:
             ap = 0
             for r in np.arange(0, 1.1, 0.1):
                 if np.any(recall >= r):
-                    ap += np.max(recall[recall >= r])/11
+                    ap += np.max(precision[recall >= r])/11
 
         return ap, precision.tolist(), recall.tolist()
