@@ -30,8 +30,17 @@ An implementation of SSD object detection using PyTorch.
     python train.py
     ```
 
+## Evaluation
+1. Modify the `model_path` in `eval.py`.
+2. Calculate mAP:
 
-## Test model
+    ```shell
+    conda activate SSD
+    python eval.py
+    ```
+
+
+## Detection
 1. Modify the `model_path` and `image_path` in `demo.py`.
 
 2. Display detection results:

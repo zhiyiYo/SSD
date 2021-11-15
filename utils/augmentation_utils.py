@@ -483,7 +483,7 @@ class ColorJitter(Transformer):
 class SSDAugmentation(Transformer):
     """ SSD 神经网络训练时使用的数据增强器 """
 
-    def __init__(self, image_size=300, mean=(104, 117, 123)):
+    def __init__(self, image_size=300, mean=(123, 117, 104)):
         super().__init__()
         self.image_size = image_size
         self.mean = mean

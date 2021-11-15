@@ -53,10 +53,12 @@ class EvalPipeline:
         self.overlap_thresh = overlap_thresh
         self.use_07_metric = use_07_metric
         self.save_dir = save_dir
+        self.image_size = image_size
 
         self.model_path = model_path
+        self.device = 'cuda:0' if use_gpu else 'cpu'
         self.model = SSD(self.dataset.n_classes+1, image_size=image_size)
-        self.model = self.model.to('cuda:0' if use_gpu else 'cpu')
+        self.model = self.model.to(self.device)
         self.model.load(model_path)
         self.model.eval()
 
@@ -70,17 +72,19 @@ class EvalPipeline:
     def _predict(self):
         """ 预测每一种类存在于哪些图片中 """
         self.preds = {c: {} for c in self.dataset.classes}
+
         print('🛸 正在预测中...')
+        size = self.image_size
         for i, (image_path, image_name) in enumerate(zip(self.dataset.image_paths, self.dataset.image_names)):
             print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
+
             # 读入图片
             x = Image.open(image_path).convert('RGB')
             w, h = x.size
-            x = cv.resize(np.array(x), (300, 300)).astype(np.float32)
-            x = ToTensor()(x).unsqueeze(0)
-            if self.use_gpu:
-                x = x.cuda()
+            x = np.array(x.resize((size, size)), np.float32)
+            x = ToTensor()(x).unsqueeze(0).to(self.device)
 
+            # 预测
             out = self.model.predict(x)[0]
 
             for i, c in enumerate(self.dataset.classes, 1):
@@ -110,7 +114,7 @@ class EvalPipeline:
 
         print('\n🧩 正在获取标签中...')
         for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotation_paths, self.dataset.image_names)):
-            print(f'\r当前进度：{i/len(self.dataset):.1%}', end='')
+            print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
 
             root = ET.parse(anno_path).getroot()
 
@@ -142,7 +146,7 @@ class EvalPipeline:
         """ 计算 mAP """
         result = {}
 
-        print('\n正在计算 AP 中...')
+        print('\n🧪 正在计算 AP 中...')
         mAP = 0
         for c in self.dataset.classes:
             ap, precision, recall = self._get_AP(c)
@@ -152,7 +156,7 @@ class EvalPipeline:
                 'recall': recall
             }
             mAP += ap
-            print(f'class {c}: ap={ap:.2%}')
+            print(f'class {c}: AP={ap:.2%}')
 
         mAP /= len(self.dataset.classes)
         print(f'mAP of {self.model_path}: {mAP:.2%}')

@@ -1,6 +1,6 @@
 # coding:utf-8
 import unittest
-from utils.plot_utils import plot_loss, plot_PR
+from utils.plot_utils import *
 
 import numpy as np
 import matplotlib as mpl
@@ -18,6 +18,11 @@ class TestPlotUtils(unittest.TestCase):
         plt.show()
 
     def test_plot_PR(self):
-        """ 测试损失绘制 """
+        """ 测试 PR 曲线绘制 """
         fig, ax = plot_PR('eval/SSD.json', 'cat')
+        plt.show()
+
+    def test_plot_AP(self):
+        """ 测试 AP 柱状图绘制 """
+        fig, ax = plot_AP('eval/SSD.json')
         plt.show()

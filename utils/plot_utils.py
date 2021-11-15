@@ -46,3 +46,21 @@ def plot_PR(file_path: str, class_name: str):
     ax.plot(result['recall'], result['precision'])
     ax.set(xlabel='recall', ylabel='precision', title='PR curve')
     return fig, ax
+
+
+def plot_AP(file_path: str):
+    """ 绘制 AP 柱状图 """
+    with open(file_path, encoding='utf-8') as f:
+        result = json.load(f)
+
+    AP = []
+    classes = []
+    for k, v in result.items():
+        AP.append(v['AP'])
+        classes.append(k)
+
+    fig, ax = plt.subplots(1, 1, num='AP 柱状图')
+    ax.barh(range(len(AP)), AP, height=0.6, tick_label=classes)
+    ax.set(xlabel='AP')
+
+    return fig, ax
