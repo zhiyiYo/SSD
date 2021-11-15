@@ -104,12 +104,14 @@ class VOCDataset(Dataset):
         super().__init__()
         self.root = root
         self.image_set = image_set
+        self.n_classes = len(self.classes)
         self.class_to_index = {c: i for i, c in enumerate(self.classes)}
         self.transformer = tranformer    # 数据增强器
         self.annotation_transformer = AnnotationTransformer(
             self.class_to_index, keep_difficult)
 
         # 获取指定数据集中的所有图片和标签文件路径
+        self.image_names = []
         self.image_paths = []
         self.annotation_paths = []
         with open(path.join(self.root, f'ImageSets/Main/{self.image_set}.txt')) as f:
@@ -117,6 +119,7 @@ class VOCDataset(Dataset):
                 line = line.strip()
                 if not line:
                     continue
+                self.image_names.append(line)
                 self.image_paths.append(
                     path.join(self.root, f'JPEGImages/{line}.jpg'))
                 self.annotation_paths.append(
