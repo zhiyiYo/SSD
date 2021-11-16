@@ -4,14 +4,13 @@ from typing import List, Union
 from pathlib import Path
 
 import numpy as np
-import cv2 as cv
 import torch
 from PIL import Image
 from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.nn import init
-from torchvision.transforms import ToTensor
 from utils.box_utils import draw
+from utils.augmentation_utils import ToTensor
 
 from .detector import Detector
 from .prior_box import PriorBox
@@ -63,7 +62,7 @@ def vgg16(batch_norm=False) -> nn.ModuleList:
 class L2Norm(nn.Module):
     """ L2 标准化 """
 
-    def __init__(self, n_channels: int, scale):
+    def __init__(self, n_channels: int, scale=20):
         """
         Parameters
         ----------
@@ -233,8 +232,7 @@ class SSD(nn.Module):
             检测结果，最后一个维度的前四个元素为边界框的坐标 `(xmin, ymin, xmax, ymax)`，最后一个元素为置信度
         """
         loc, conf, prior = self(x)
-        out = self.detector(loc, F.softmax(conf, dim=-1), prior.to(loc.device))
-        return out
+        return self.detector(loc, F.softmax(conf, dim=-1), prior.to(loc.device))
 
     def detect(self, image_path: str, classes: List[str], conf_thresh=0.6, mean=(123, 117, 104), use_gpu=True) -> Image.Image:
         """ 检测输入图像中的目标
@@ -267,13 +265,11 @@ class SSD(nn.Module):
         if not os.path.exists(image_path):
             raise FileNotFoundError("图片不存在，请检查图片路径！")
 
-        image = Image.open(image_path).convert('RGB')
-        w, h = image.size
+        image = np.array(Image.open(image_path).convert('RGB'))
+        h, w, _ = image.shape
 
-        size = self.image_size
-        x = np.array(image.resize((size, size)), np.float32)
-        x -= mean
-        x = ToTensor()(x).unsqueeze(0)
+        transformer = ToTensor(self.image_size, mean)
+        x = transformer.transform(image)
         if use_gpu:
             x = x.cuda()
 

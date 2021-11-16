@@ -158,7 +158,7 @@ class VOCDataset(Dataset):
             image, bbox, label = self.transformer.transform(image, bbox, label)
             target = np.hstack((bbox, label[:, np.newaxis]))
 
-        return torch.from_numpy(image.astype(np.uint8)).permute(2, 0, 1), target
+        return torch.from_numpy(image.copy()).permute(2, 0, 1), target
 
 
 def collate_fn(batch: List[Tuple[torch.Tensor, np.ndarray]]):

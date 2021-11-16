@@ -1,12 +1,14 @@
 # coding:utf-8
+from random import choice as randchoice
 from typing import List
+
 import cv2 as cv
 import numpy as np
-from numpy import ndarray
-from numpy import random
-from random import choice as randchoice
-from .box_utils import jaccard_overlap_numpy
+import torch
+from numpy import ndarray, random
 from torchvision import transforms as T
+
+from .box_utils import jaccard_overlap_numpy
 
 
 class Transformer:
@@ -60,6 +62,46 @@ class ImageToFloat32(Transformer):
         return image.astype(np.float32), bbox, label
 
 
+class ToTensor(Transformer):
+    """ 将 np.ndarray 图像转换为 Tensor """
+
+    def __init__(self, image_size=300, mean=(123, 117, 104)):
+        """
+        Parameters
+        ----------
+        image_size: int
+            缩放后的图像尺寸
+
+        mean: tuple
+            RGB 图像各通道的均值
+        """
+        super().__init__()
+        self.mean = mean
+        self.image_size = image_size
+
+    def transform(self, image: ndarray, bbox: ndarray = None, label: ndarray = None):
+        """ 将图像进行缩放、中心化并转换为 Tensor
+
+        Parameters
+        ----------
+        image: `~np.ndarray`
+            RGB 图像
+
+        bbox, label: None
+            没有用到
+
+        Returns
+        -------
+        image: Tensor of shape `(1, 3, image_size, image_size)`
+            转换后的图像
+        """
+        size = self.image_size
+        x = cv.resize(image, (size, size)).astype(np.float32)
+        x -= self.mean
+        x = torch.from_numpy(x).permute(2, 0, 1).unsqueeze(0)
+        return x
+
+
 class Centralization(Transformer):
     """ 图像中心化 """
 
@@ -68,6 +110,7 @@ class Centralization(Transformer):
         self.mean = mean
 
     def transform(self, image: ndarray, bbox: ndarray, label: ndarray):
+        image = image.astype(np.float32)
         return image-self.mean, bbox, label
 
 
@@ -239,7 +282,7 @@ class ConvertColor(Transformer):
 class RandomContrast(Transformer):
     """ 随机调整对比度 """
 
-    def __init__(self, lower=0.8, upper=1.1):
+    def __init__(self, lower=0.5, upper=1.5):
         """
         Parameters
         ----------
@@ -284,7 +327,7 @@ class RandomBrightness(Transformer):
 class RandomSampleCrop(Transformer):
     """ 随机裁剪 """
 
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
         self.sample_options = [
             # 直接返回原图
@@ -363,25 +406,21 @@ class RandomSampleCrop(Transformer):
 class Expand(Transformer):
     """ 增大图像并在旁边填充颜色 """
 
-    def __init__(self, mean: tuple, max_ratio=2):
+    def __init__(self, mean: tuple):
         """
         Parameters
         ----------
         mean: tuple
             填充的颜色
-
-        max_ratio: int
-            放大系数的上限
         """
         self.mean = mean
-        self.max_ratio = max_ratio
 
     def transform(self, image: ndarray, bbox: ndarray, label: ndarray):
         if random.randint(2):
             return image, bbox, label
 
         h, w, c = image.shape
-        ratio = random.uniform(1, 3)
+        ratio = random.uniform(1, 4)
         left = int(random.uniform(0, w*ratio-w))
         top = int(random.uniform(0, h*ratio-h))
 
@@ -401,7 +440,7 @@ class Expand(Transformer):
 class Resize(Transformer):
     """ 调整图像大小 """
 
-    def __init__(self, size=(300, 300)) -> None:
+    def __init__(self, size=(300, 300)):
         super().__init__()
         self.size = size
 
@@ -431,7 +470,7 @@ class Resize(Transformer):
 class RandomFlip(Transformer):
     """ 随机翻转 """
 
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
         self.direction = [None, 'H', 'V']   # 翻转方向
 
@@ -452,7 +491,7 @@ class RandomFlip(Transformer):
 class ColorJitter(Transformer):
     """ 随机调整图像的色调、饱和度、对比度、亮度和颜色通道 """
 
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
         self.transformers = [
             RandomContrast(),
@@ -467,9 +506,6 @@ class ColorJitter(Transformer):
         self.rand_swap_channel = RandomSwapChannel()
 
     def transform(self, image: ndarray, bbox: ndarray, label: ndarray):
-        if random.randint(2):
-            return image, bbox, label
-
         image, bbox, label = self.rand_brightness.transform(image, bbox, label)
 
         if random.randint(2):
@@ -496,7 +532,7 @@ class SSDAugmentation(Transformer):
             RandomFlip(),
             BBoxToPercentCoords(),
             Resize((image_size, image_size)),
-            # Centralization(mean)
+            Centralization(mean)
         ])
 
     def transform(self, image: ndarray, bbox: ndarray, label: ndarray):

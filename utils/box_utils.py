@@ -1,13 +1,13 @@
 # coding: utf-8
 from typing import Union
-from itertools import cycle
+import cmapy
 
 import numpy as np
 import torch
 from numpy import ndarray
 from torch import Tensor
 
-from PIL import Image, ImageDraw, ImageFont, ImageColor
+from PIL import Image, ImageDraw, ImageFont
 
 
 def log_sum_exp(x: Tensor):
@@ -300,15 +300,13 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
     bbox = bbox.astype(np.int)
 
     if isinstance(image, ndarray):
-        image = Image.fromarray(image)  # type:Image.Image
+        image = Image.fromarray(image.astype(np.uint8))  # type:Image.Image
 
     image_draw = ImageDraw.Draw(image, 'RGBA')
     font = ImageFont.truetype('resource/font/msyh.ttc', size=13)
-    colors = cycle([
-        '#0072BD', '#D95319', '#EDB120',
-        '#7E2F8E', '#77AC30', '#4DBEEE',
-        '#A2142F', '#7F7F7F', '#BCBD22', '#17BECF'
-    ])
+
+    label_unique = np.unique(label).tolist()
+    color_indexes = np.linspace(0, 255, len(label_unique), dtype=int)
 
     for i in range(bbox.shape[0]):
         x1 = max(0, bbox[i, 0])
@@ -316,7 +314,10 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         x2 = min(image.width-1, bbox[i, 2])
         y2 = min(image.height-1, bbox[i, 3])
 
-        color = next(colors)
+        # 选择颜色
+        class_index = label_unique.index(label[i])
+        color = to_hex_color(cmapy.color(
+            'viridis', color_indexes[class_index], True))
 
         # 绘制方框
         image_draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
@@ -324,7 +325,7 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         # 绘制标签
         y1_ = y1 if y1-23 < 0 else y1-23
         y2_ = y1 if y1_ < y1 else y1+23
-        text = label[i] if conf is None else f'{label[i]} | {conf[i]:.3f}'
+        text = label[i] if conf is None else f'{label[i]} | {conf[i]:.2f}'
         l = font.getlength(text) + 3
         image_draw.rectangle([x1, y1_, x1+l, y2_],
                              fill=color+'75', outline=color+'DD')
@@ -332,3 +333,9 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
                         font=font, embedded_color=color)
 
     return image
+
+
+def to_hex_color(color):
+    """ 将颜色转换为 16 进制 """
+    color = [hex(c)[2:].zfill(2) for c in color]
+    return '#'+''.join(color)

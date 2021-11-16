@@ -1,5 +1,6 @@
 # coding:utf-8
 import unittest
+import torch
 
 from net.dataset import VOCDataset
 from torchvision import transforms as T
@@ -49,9 +50,9 @@ class TestAugmentation(unittest.TestCase):
         image, target = self.dataset[6]
         self.draw(image, target)
 
-    def draw(self, image, target):
+    def draw(self, image: torch.Tensor, target):
         """ 绘制图像 """
-        image = T.ToPILImage()(image)
+        image = image.permute(1, 2, 0).numpy()
         label = [self.dataset.classes[int(i)] for i in target[:, 4]]
 
         # 绘制边界框和标签

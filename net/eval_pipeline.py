@@ -2,15 +2,13 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict
 from xml.etree import ElementTree as ET
 
-import cv2 as cv
 import numpy as np
 import torch
 from PIL import Image
-from torchvision.transforms import ToTensor
 from utils.box_utils import jaccard_overlap_numpy
+from utils.augmentation_utils import ToTensor
 
 from .dataset import VOCDataset
 from .ssd import SSD
@@ -20,7 +18,7 @@ class EvalPipeline:
     """ 测试模型流水线 """
 
     def __init__(self, model_path: str, dataset: VOCDataset, image_size=300, mean=(123, 117, 104),
-                 top_k=200, conf_thresh=0.6, overlap_thresh=0.5, save_dir='eval', use_07_metric=False,
+                 top_k=200, conf_thresh=0.05, overlap_thresh=0.5, save_dir='eval', use_07_metric=False,
                  use_gpu=True):
         """
         Parameters
@@ -91,6 +89,7 @@ class EvalPipeline:
                 return
 
         self.preds = {c: {} for c in self.dataset.classes}
+        transformer = ToTensor(self.image_size, self.mean)
 
         print('🛸 正在预测中...')
         size = self.image_size
@@ -98,13 +97,11 @@ class EvalPipeline:
             print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
 
             # 读入图片
-            x = Image.open(image_path).convert('RGB')
-            w, h = x.size
-            x = np.array(x.resize((size, size)), np.float32)
-            x -= self.mean
-            x = ToTensor()(x).unsqueeze(0).to(self.device)
+            image = np.array(Image.open(image_path).convert('RGB'))
+            h, w, _ = image.shape
 
             # 预测
+            x = transformer.transform(image).to(self.device)
             out = self.model.predict(x)[0]
 
             for i, c in enumerate(self.dataset.classes, 1):
@@ -128,7 +125,7 @@ class EvalPipeline:
                     "conf": conf.tolist()
                 }
 
-        # 缓存数据
+        # 保存预测数据
         self.save_dir.mkdir(exist_ok=True)
         with open(p, 'w', encoding='utf-8') as f:
             json.dump(self.preds, f)
@@ -136,8 +133,9 @@ class EvalPipeline:
     def _get_ground_truth(self):
         """ 获取 ground truth 中每一种类存在于哪些图片中 """
         self.ground_truths = {c: {} for c in self.dataset.classes}
+        self.n_positives = {c: 0 for c in self.dataset.classes}
 
-        print('\n🧩 正在获取标签中...')
+        print('\n\n🧩 正在获取标签中...')
         for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotation_paths, self.dataset.image_names)):
             print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
 
@@ -166,6 +164,7 @@ class EvalPipeline:
                 self.ground_truths[c][img_name]['bbox'].append(bbox)
                 self.ground_truths[c][img_name]['detected'].append(False)
                 self.ground_truths[c][img_name]['difficult'].append(difficult)
+                self.n_positives[c] += (1-difficult)
 
     def _get_mAP(self):
         """ 计算 mAP """
@@ -186,7 +185,7 @@ class EvalPipeline:
         mAP /= len(self.dataset.classes)
         print(f'mAP of {self.model_path}: {mAP:.2%}')
 
-        # 保存统计结果
+        # 保存评估结果
         self.save_dir.mkdir(exist_ok=True)
         p = self.save_dir / (self.model_path.stem + '_AP.json')
         with open(p, 'w', encoding='utf-8') as f:
@@ -240,7 +239,6 @@ class EvalPipeline:
         # 计算 TP 和 FP
         tp = np.zeros(len(image_names))  # type:np.ndarray
         fp = np.zeros(len(image_names))  # type:np.ndarray
-        n_positives = 0
         for i, image_name in enumerate(image_names):
             # 获取一张图片中关于这个类的 ground truth
             record = ground_truth.get(image_name)
@@ -253,7 +251,6 @@ class EvalPipeline:
             bbox_pred = bbox[i]  # shape:(4, )
             bbox_gt = np.array(record['bbox'])  # shape:(n, 4)
             difficult = np.array(record['difficult'], np.bool)  # shape:(n, )
-            n_positives += np.sum(~difficult)
 
             # 计算交并比
             iou = jaccard_overlap_numpy(bbox_pred, bbox_gt)
@@ -273,6 +270,7 @@ class EvalPipeline:
         # 查全率和查准率
         tp = tp.cumsum()
         fp = fp.cumsum()
+        n_positives = self.n_positives[c]
         recall = tp / n_positives  # type:np.ndarray
         precision = tp / (tp + fp)  # type:np.ndarray
 
