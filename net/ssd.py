@@ -234,13 +234,14 @@ class SSD(nn.Module):
         loc, conf, prior = self(x)
         return self.detector(loc, F.softmax(conf, dim=-1), prior.to(loc.device))
 
-    def detect(self, image_path: str, classes: List[str], conf_thresh=0.6, mean=(123, 117, 104), use_gpu=True) -> Image.Image:
+    def detect(self, image: Union[str, np.ndarray], classes: List[str], conf_thresh=0.6,
+               mean=(123, 117, 104), use_gpu=True) -> Image.Image:
         """ 检测输入图像中的目标
 
         Parameters
         ----------
-        image_path: str
-            图片路径
+        image: str or `np.ndarray`
+            图片路径或者 RGB 图像数组
 
         classes: List[str]
             类别列表，不包含背景
@@ -262,11 +263,15 @@ class SSD(nn.Module):
         if not 0 <= conf_thresh < 1:
             raise ValueError("置信度阈值必须在 [0, 1) 范围内")
 
-        if not os.path.exists(image_path):
-            raise FileNotFoundError("图片不存在，请检查图片路径！")
+        if isinstance(image, str):
+            if os.path.exists(image):
+                image = np.array(Image.open(image).convert('RGB'))
+            else:
+                raise FileNotFoundError("图片不存在，请检查图片路径！")
 
-        image = np.array(Image.open(image_path).convert('RGB'))
-        h, w, _ = image.shape
+        h, w, channels = image.shape
+        if channels != 3:
+            raise ValueError('输入的必须是三个通道的 RGB 图像')
 
         transformer = ToTensor(self.image_size, mean)
         x = transformer.transform(image)
