@@ -37,7 +37,7 @@ class TrainPipeline:
     """ 训练 SSD 模型 """
 
     def __init__(self, dataset: Dataset, vgg_path: str = None, ssd_path: str = None,
-                 lr=0.001, momentum=0.9, weight_decay=5e-4, lr_steps=(40000, 50000, 6000),
+                 lr=0.001, momentum=0.9, weight_decay=5e-4, lr_steps=(40000, 50000, 60000),
                  batch_size=16, start_iter=0, max_iter=60000, save_frequency=2000, use_gpu=True, save_dir='model',
                  log_file: str = None, log_dir='log', **config):
         """
