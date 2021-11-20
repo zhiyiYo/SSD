@@ -83,7 +83,7 @@ class L2Norm(nn.Module):
         init.constant_(self.weight, self.gamma)
 
     def forward(self, x: Tensor):
-        norm = x.pow(2).sum(dim=1, keepdim=True).sqrt()+self.eps
+        norm = (x.pow(2).sum(dim=1, keepdim=True)+self.eps).sqrt()
         x = torch.div(x, norm)
         # 将 weight 的维度变为 [1, n_channels, 1, 1]
         y = x*self.weight[None, ..., None, None]
