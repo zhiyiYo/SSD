@@ -21,7 +21,7 @@ An implementation of SSD object detection using PyTorch.
     python download.py
     ```
 
-2. Download pre-trained and fc-reduced `VGG16` model from [here](https://github.com/zhiyiYo/SSD/releases/download/v1.0/vgg16_reducedfc.pth).
+2. Download pre-trained and fc-reduced `VGG16` model from [here](https://github.com/zhiyiYo/SSD/releases/download/v1.0.0/vgg16_reducedfc.pth).
 
 3. Start training:
 
