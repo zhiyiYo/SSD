@@ -282,7 +282,7 @@ class ConvertColor(Transformer):
 class RandomContrast(Transformer):
     """ 随机调整对比度 """
 
-    def __init__(self, lower=0.5, upper=1.5):
+    def __init__(self, lower=0.8, upper=1.1):
         """
         Parameters
         ----------

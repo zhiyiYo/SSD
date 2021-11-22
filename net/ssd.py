@@ -126,8 +126,7 @@ class SSD(nn.Module):
 
         self.n_classes = n_classes
         self.image_size = image_size
-        config['image_size'] = image_size
-        self.priorbox_generator = PriorBox(**config)
+        self.priorbox_generator = PriorBox(image_size, **config)
         self.prior = Tensor(self.priorbox_generator())
         self.detector = Detector(
             n_classes, variance, top_k, conf_thresh, nms_thresh)

@@ -7,7 +7,7 @@ from imutils.video import FPS, WebcamVideoStream
 from net import SSD
 
 
-def image_detect(model_path: str, image_path: str, classes: List[str], conf_thresh=0.6, use_gpu=True):
+def image_detect(model_path: str, image_path: str, classes: List[str], conf_thresh=0.6, nms_thresh=0.45, use_gpu=True):
     """ 检测图像中的目标
 
     Parameters
@@ -24,6 +24,9 @@ def image_detect(model_path: str, image_path: str, classes: List[str], conf_thre
     conf_thresh: float
         置信度阈值，不会显示小于这个阈值的预测框
 
+    nms_thresh: float
+        nms 中交并比的阈值，越小保留的预测框越少
+
     use_gpu: bool
         是否使用 gpu 加速检测
 
@@ -33,7 +36,7 @@ def image_detect(model_path: str, image_path: str, classes: List[str], conf_thre
         绘制了边界框、类别和置信度的图像
     """
     # 创建模型
-    model = SSD(len(classes)+1)
+    model = SSD(len(classes)+1, nms_thresh=nms_thresh)
     if use_gpu:
         model = model.cuda()
 
@@ -45,7 +48,7 @@ def image_detect(model_path: str, image_path: str, classes: List[str], conf_thre
     return model.detect(image_path, classes, conf_thresh, use_gpu=use_gpu)
 
 
-def camera_detect(model_path: str, classes: List[str], camera_src=0, conf_thresh=0.6, use_gpu=True):
+def camera_detect(model_path: str, classes: List[str], camera_src=0, conf_thresh=0.6, nms_thresh=0.45, use_gpu=True):
     """ 从摄像头中实时检测物体
 
     Parameters
@@ -62,11 +65,14 @@ def camera_detect(model_path: str, classes: List[str], camera_src=0, conf_thresh
     conf_thresh: float
         置信度阈值，不会显示小于这个阈值的预测框
 
+    nms_thresh: float
+        NMS 操作的阈值，越小保留的预测框越少
+
     use_gpu: bool
         是否使用 gpu 加速检测
     """
     # 创建模型
-    model = SSD(len(classes)+1)
+    model = SSD(len(classes)+1, nms_thresh=nms_thresh)
     if use_gpu:
         model = model.cuda()
 

@@ -231,7 +231,7 @@ def nms(boxes: Tensor, scores: Tensor, overlap_thresh=0.5, top_k=200):
         某个类的每个先验框的置信度
 
     overlap_thresh: float
-        IOU 阈值，大于阈值的部分预测框会被移除，值越小保留的框越多
+        IOU 阈值，大于阈值的部分预测框会被移除，值越小保留的框越少
 
     top_k: int
         保留的预测框个数上限

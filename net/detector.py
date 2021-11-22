@@ -25,7 +25,7 @@ class Detector:
             置信度阈值
 
         nms_thresh: float
-            nms 操作中 iou 的阈值，越小保留的预测框越多
+            nms 操作中 iou 的阈值，越小保留的预测框越少
         """
         self.n_classes = n_classes
         self.conf_thresh = conf_thresh
