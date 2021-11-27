@@ -30,7 +30,7 @@ def exception_handler(train_func):
                 traceback.print_exc()
 
             train_pipeline.save()
-            exit()
+            torch.cuda.empty_cache()
 
     return wrapper
 
@@ -209,7 +209,8 @@ class TrainPipeline:
             shuffle=True,
             collate_fn=collate_fn,
             num_workers=self.num_workers,
-            pin_memory=True
+            pin_memory=True,
+            drop_last=True
         )
         # 无穷迭代器
         data_iter = itertools.cycle(data_loader)

@@ -5,3 +5,4 @@ matplotlib==3.3.4
 tqdm==4.61.2
 cmapy==0.6.6
 imutils==0.5.4
+imgaug==0.4.0

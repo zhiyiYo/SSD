@@ -7,7 +7,7 @@ from xml.etree import ElementTree as ET
 import numpy as np
 import torch
 from PIL import Image
-from utils.box_utils import jaccard_overlap_numpy
+from utils.box_utils import jaccard_overlap_numpy, rescale_bbox
 from utils.augmentation_utils import ToTensor
 
 from .dataset import VOCDataset
@@ -89,7 +89,7 @@ class EvalPipeline:
                 return
 
         self.preds = {c: {} for c in self.dataset.classes}
-        transformer = ToTensor(self.image_size, self.mean)
+        transformer = ToTensor(self.image_size)
 
         print('🛸 正在预测中...')
         size = self.image_size
@@ -102,11 +102,11 @@ class EvalPipeline:
 
             # 预测
             x = transformer.transform(image).to(self.device)
-            out = self.model.predict(x)[0]
+            out = self.model.predict(x)[0].cpu().numpy()
 
             for i, c in enumerate(self.dataset.classes, 1):
-                y = out[i].cpu().numpy()
-                mask = y[:, -1] > self.conf_thresh
+                y = out[i]
+                mask = y[:, -1] >= self.conf_thresh
 
                 # 如果没有一个边界框的置信度大于阈值就纸条跳过这个类
                 if not mask.any():
@@ -114,9 +114,7 @@ class EvalPipeline:
 
                 # 筛选出满足阈值条件的边界框
                 conf = y[:, -1][mask]  # type:np.ndarray
-                bbox = y[:, :4][mask]  # type:np.ndarray
-                bbox[:, [0, 2]] *= w
-                bbox[:, [1, 3]] *= h
+                bbox = rescale_bbox(y[:, :4][mask], self.image_size, h, w)
                 bbox += 1
 
                 # 保存预测结果
@@ -250,7 +248,6 @@ class EvalPipeline:
 
             bbox_pred = bbox[i]  # shape:(4, )
             bbox_gt = np.array(record['bbox'])  # shape:(n, 4)
-            difficult = np.array(record['difficult'], np.bool)  # shape:(n, )
 
             # 计算交并比
             iou = jaccard_overlap_numpy(bbox_pred, bbox_gt)

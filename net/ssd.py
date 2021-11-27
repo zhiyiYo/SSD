@@ -9,7 +9,7 @@ from PIL import Image
 from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.nn import init
-from utils.box_utils import draw
+from utils.box_utils import draw, rescale_bbox
 from utils.augmentation_utils import ToTensor
 
 from .detector import Detector
@@ -233,8 +233,7 @@ class SSD(nn.Module):
         loc, conf, prior = self(x)
         return self.detector(loc, F.softmax(conf, dim=-1), prior.to(loc.device))
 
-    def detect(self, image: Union[str, np.ndarray], classes: List[str], conf_thresh=0.6,
-               mean=(123, 117, 104), use_gpu=True, show_conf=True) -> Image.Image:
+    def detect(self, image: Union[str, np.ndarray], classes: List[str], conf_thresh=0.6, use_gpu=True, show_conf=True) -> Image.Image:
         """ 检测输入图像中的目标
 
         Parameters
@@ -247,9 +246,6 @@ class SSD(nn.Module):
 
         conf_thresh: float
             置信度阈值，舍弃小于这个阈值的预测框
-
-        mean: tuple
-            图像中心化时减去的值
 
         use_gpu: bool
             是否使用 gpu 加速检测
@@ -275,26 +271,24 @@ class SSD(nn.Module):
         if channels != 3:
             raise ValueError('输入的必须是三个通道的 RGB 图像')
 
-        transformer = ToTensor(self.image_size, mean)
+        transformer = ToTensor(self.image_size)
         x = transformer.transform(image)
         if use_gpu:
             x = x.cuda()
 
         # 预测边界框和置信度，shape: (n_classes, top_k, 5)
-        y = self.predict(x)[0]
+        y = self.predict(x)[0].detach().numpy()
 
         # 筛选出置信度不小于阈值的预测框
         bbox = []
         conf = []
         label = []
-        for c in range(1, y.size(0)):
+        for c in range(1, y.shape[0]):
             mask = y[c, :, -1] >= conf_thresh
 
             # 将归一化的边界框还原
-            boxes = y[c, :, :4][mask]
-            boxes[:, [0, 2]] *= w
-            boxes[:, [1, 3]] *= h
-            bbox.append(boxes.detach().numpy())
+            boxes = rescale_bbox(y[c, :, :4][mask], self.image_size, h, w)
+            bbox.append(boxes)
 
             conf.extend(y[c, :, -1][mask].tolist())
             label.extend([classes[c-1]] * mask.sum())

@@ -317,7 +317,7 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         # 选择颜色
         class_index = label_unique.index(label[i])
         color = to_hex_color(cmapy.color(
-            'viridis', color_indexes[class_index], True))
+            'rainbow', color_indexes[class_index], True))
 
         # 绘制方框
         image_draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
@@ -327,9 +327,11 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         y2_ = y1 if y1_ < y1 else y1+23
         text = label[i] if conf is None else f'{label[i]} | {conf[i]:.2f}'
         l = font.getlength(text) + 3
-        image_draw.rectangle([x1, y1_, x1+l, y2_],
-                             fill=color+'75', outline=color+'DD')
-        image_draw.text([x1+2, y1_+2], text=text,
+        right = x1+l if x1+l <= image.width-1 else image.width-1
+        left = int(right - l)
+        image_draw.rectangle([left, y1_, right, y2_],
+                             fill=color+'AA', outline=color+'DD')
+        image_draw.text([left+2, y1_+2], text=text,
                         font=font, embedded_color=color)
 
     return image
@@ -339,3 +341,41 @@ def to_hex_color(color):
     """ 将颜色转换为 16 进制 """
     color = [hex(c)[2:].zfill(2) for c in color]
     return '#'+''.join(color)
+
+
+def rescale_bbox(bbox: ndarray, image_size: int, h: int, w: int):
+    """ 还原被填充和缩放后的图片的预测框
+
+    Parameters
+    ----------
+    bbox: `~np.ndarray` of shape `(n_objects, 4)`
+        预测框，坐标形式为 `(xmin, ymin, xmax, ymax)`
+
+    image_size: int
+        图像被缩放后的尺寸
+
+    h: int
+        原始图像的高度
+
+    w: int
+        原始图像的宽度
+
+    Returns
+    -------
+    bbox: `~np.ndarray` of shape `(n_objects, 4)`
+        预测框，坐标形式为 `(cx, cy, w, h)`
+    """
+    bbox *= image_size
+    
+    # 图像填充区域大小
+    pad_x = max(h-w, 0)*image_size/max(h, w)
+    pad_y = max(w-h, 0)*image_size/max(h, w)
+
+    # 被缩放后的图像中的有效图像区域
+    w_ = image_size - pad_x
+    h_ = image_size - pad_y
+
+    # 还原边界框
+    bbox[:, [0, 2]] = (bbox[:, [0, 2]]-pad_x/2)*w/w_
+    bbox[:, [1, 3]] = (bbox[:, [1, 3]]-pad_y/2)*h/h_
+    return bbox

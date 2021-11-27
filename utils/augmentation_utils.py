@@ -5,8 +5,8 @@ from typing import List
 import cv2 as cv
 import numpy as np
 import torch
+from imgaug import augmenters as iaa
 from numpy import ndarray, random
-from torchvision import transforms as T
 
 from .box_utils import jaccard_overlap_numpy
 
@@ -78,6 +78,7 @@ class ToTensor(Transformer):
         super().__init__()
         self.mean = mean
         self.image_size = image_size
+        self.pad = iaa.PadToAspectRatio(1, position='center-center')
 
     def transform(self, image: ndarray, bbox: ndarray = None, label: ndarray = None):
         """ 将图像进行缩放、中心化并转换为 Tensor
@@ -96,8 +97,9 @@ class ToTensor(Transformer):
             转换后的图像
         """
         size = self.image_size
+        image = self.pad(image=image)
         x = cv.resize(image, (size, size)).astype(np.float32)
-        x -= self.mean
+        x /= 255
         x = torch.from_numpy(x).permute(2, 0, 1).unsqueeze(0)
         return x
 
@@ -524,7 +526,6 @@ class SSDAugmentation(Transformer):
             RandomFlip(),
             BBoxToPercentCoords(),
             Resize((image_size, image_size)),
-            Centralization(mean)
         ])
 
     def transform(self, image: ndarray, bbox: ndarray, label: ndarray):

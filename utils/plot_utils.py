@@ -16,16 +16,17 @@ def plot_loss(log_file: str):
         损失日志文件路径
     """
     logger = LossLogger(None, log_file)
-    iteration = np.arange(0, len(logger.losses))*418
+    iteration = np.arange(0, len(logger.losses))+1
 
-    fig, ax = plt.subplots(1, 1, num='损失曲线')
-    ax.plot(iteration, logger.losses, label='loss')
-    ax.plot(iteration, logger.loc_losses, label='loc_loss')
-    ax.plot(iteration, logger.conf_losses, label='conf_loss')
-    ax.set(xlabel='iteration', ylabel='loss', title='SSD Loss Curve')
-    ax.legend()
+    fig, axes = plt.subplots(1, 3, num='损失曲线', tight_layout=True)
+    titles = ['Total Loss', 'Confidence Loss', 'Location Loss']
+    losses = [logger.losses, logger.conf_losses, logger.loc_losses]
 
-    return fig, ax
+    for ax, title, loss in zip(axes, titles, losses):
+        ax.plot(iteration, loss)
+        ax.set(xlabel='epoch', title=title)
+
+    return fig, axes
 
 
 def plot_PR(file_path: str, class_name: str):
