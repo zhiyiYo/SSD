@@ -56,6 +56,8 @@ An implementation of SSD object detection using PyTorch.
    * http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
    * http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar
 
+2. Sometimes `loss` may become `nan`. If this happens, please reduce the value of `lr`.
+
 
 ## Reference
 * [[Paper] SSD: Single Shot MultiBox Detector](https://arxiv.org/abs/1512.02325)

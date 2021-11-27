@@ -130,7 +130,7 @@ class VOCDataset(Dataset):
                     line = line.strip()
                     if not line:
                         continue
-                    self.image_names.append(line)
+                    self.image_names.append(root+line)
                     self.image_paths.append(
                         path.join(root, f'JPEGImages/{line}.jpg'))
                     self.annotation_paths.append(

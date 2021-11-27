@@ -185,7 +185,7 @@ class TrainPipeline:
         # 保存训练损失数据
         self.logger.save(f'train_losses_{self.current_iter+1}')
 
-        print(f'\n🎉 已将当前模型保存到 {path.absolute()}\n')
+        print(f'\n\n🎉 已将当前模型保存到 {path.absolute()}\n')
 
     @staticmethod
     def xavier(module):
@@ -254,7 +254,7 @@ class TrainPipeline:
                 self.logger.update(loc_loss.item(), conf_loss.item())
 
                 # 定期保存模型
-                if i > self.start_iter and (i-self.start_iter) % self.save_frequency == 0:
+                if i > self.start_iter and (i+1-self.start_iter) % self.save_frequency == 0:
                     self.save()
 
         self.save()
