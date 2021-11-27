@@ -105,7 +105,7 @@ class SSDLoss(nn.Module):
         conf_loss = F.cross_entropy(conf_pred, conf_t.type(torch.int64), reduction='sum')
 
         # 将损失除以正样本个数
-        n_positive = n_negative.detach().sum()
+        n_positive = n_positive.detach().sum()
         loc_loss /= n_positive
         conf_loss /= n_positive
 

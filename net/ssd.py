@@ -234,7 +234,7 @@ class SSD(nn.Module):
         return self.detector(loc, F.softmax(conf, dim=-1), prior.to(loc.device))
 
     def detect(self, image: Union[str, np.ndarray], classes: List[str], conf_thresh=0.6,
-               mean=(123, 117, 104), use_gpu=True) -> Image.Image:
+               mean=(123, 117, 104), use_gpu=True, show_conf=True) -> Image.Image:
         """ 检测输入图像中的目标
 
         Parameters
@@ -253,6 +253,9 @@ class SSD(nn.Module):
 
         use_gpu: bool
             是否使用 gpu 加速检测
+
+        show_conf: bool
+            是否显示置信度
 
         Returns
         -------
@@ -295,6 +298,9 @@ class SSD(nn.Module):
 
             conf.extend(y[c, :, -1][mask].tolist())
             label.extend([classes[c-1]] * mask.sum())
+
+        if not show_conf:
+            conf = None
 
         image = draw(image, np.vstack(bbox), label, conf)
         return image

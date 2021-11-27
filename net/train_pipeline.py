@@ -1,12 +1,14 @@
 # coding:utf-8
 import itertools
 import math
-import os
 import traceback
 from datetime import datetime
+from pathlib import Path
+import time
 
 import torch
-from torch import nn, optim
+from torch import nn, optim, cuda
+from torch.backends import cudnn
 from torch.nn import init
 
 from torch.utils.data import DataLoader, Dataset
@@ -38,8 +40,8 @@ class TrainPipeline:
 
     def __init__(self, dataset: Dataset, vgg_path: str = None, ssd_path: str = None,
                  lr=0.001, momentum=0.9, weight_decay=5e-4, lr_steps=(40000, 50000, 60000),
-                 batch_size=16, start_iter=0, max_iter=60000, save_frequency=2000, use_gpu=True, save_dir='model',
-                 log_file: str = None, log_dir='log', **config):
+                 batch_size=16, num_workers=0, start_iter=0, max_iter=60000, save_frequency=2000,
+                 use_gpu=True, save_dir='model', log_file: str = None, log_dir='log', **config):
         """
         Parameters
         ----------
@@ -68,6 +70,9 @@ class TrainPipeline:
 
         batch_size: int
             训练集 batch 大小
+
+        num_workers: int
+            加载数据的线程数，Windows 系统必须为 0
 
         start_iter: int
             SSD 模型文件包含的参数是训练了多少次的结果
@@ -120,11 +125,17 @@ class TrainPipeline:
         self.config.update(config)
 
         self.dataset = dataset
-        self.save_dir = save_dir
+        self.save_dir = Path(save_dir)
         self.use_gpu = use_gpu
-        self.device = torch.device('cuda:0' if use_gpu else 'cpu')
         self.save_frequency = save_frequency
         self.batch_size = batch_size
+        self.num_workers = num_workers
+
+        if use_gpu and cuda.is_available():
+            self.device = torch.device('cuda')
+            cudnn.benchmark = True
+        else:
+            self.device = torch.device('cpu')
 
         # 一个 epoch 有多少个 batch
         self.n_batches = math.ceil(len(self.dataset)/self.batch_size)
@@ -164,17 +175,17 @@ class TrainPipeline:
 
     def save(self):
         """ 保存模型和训练损失数据 """
-        os.makedirs(self.save_dir, exist_ok=True)
+        self.save_dir.mkdir(exist_ok=True, parents=True)
 
         # 保存模型
         self.model.eval()
-        path = f'{self.save_dir}/SSD_{self.current_iter}.pth'
+        path = self.save_dir/f'SSD_{self.current_iter+1}.pth'
         torch.save(self.model.state_dict(), path)
 
         # 保存训练损失数据
-        self.logger.save(f'losses_{self.current_iter}')
+        self.logger.save(f'train_losses_{self.current_iter+1}')
 
-        print(f'\n🎉 已将当前模型保存到 {os.path.join(os.getcwd(), path)}')
+        print(f'\n🎉 已将当前模型保存到 {path.absolute()}\n')
 
     @staticmethod
     def xavier(module):
@@ -188,8 +199,18 @@ class TrainPipeline:
     @exception_handler
     def train(self):
         """ 训练模型 """
+        t = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time()))
+        self.save_dir = self.save_dir/t
+        self.logger.save_dir = self.logger.save_dir/t
+
         data_loader = DataLoader(
-            self.dataset, self.batch_size, shuffle=True, collate_fn=collate_fn)
+            self.dataset,
+            self.batch_size,
+            shuffle=True,
+            collate_fn=collate_fn,
+            num_workers=self.num_workers,
+            pin_memory=True
+        )
         # 无穷迭代器
         data_iter = itertools.cycle(data_loader)
 

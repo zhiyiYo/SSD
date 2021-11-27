@@ -7,7 +7,7 @@ from imutils.video import FPS, WebcamVideoStream
 from net import SSD
 
 
-def image_detect(model_path: str, image_path: str, classes: List[str], conf_thresh=0.6, nms_thresh=0.45, use_gpu=True):
+def image_detect(model_path: str, image_path: str, classes: List[str], conf_thresh=0.6, nms_thresh=0.45, use_gpu=True, show_conf=True):
     """ 检测图像中的目标
 
     Parameters
@@ -30,6 +30,9 @@ def image_detect(model_path: str, image_path: str, classes: List[str], conf_thre
     use_gpu: bool
         是否使用 gpu 加速检测
 
+    show_conf: bool
+        是否显示置信度
+
     Returns
     -------
     image: `~PIL.Image.Image`
@@ -45,7 +48,7 @@ def image_detect(model_path: str, image_path: str, classes: List[str], conf_thre
     model.eval()
 
     # 检测目标
-    return model.detect(image_path, classes, conf_thresh, use_gpu=use_gpu)
+    return model.detect(image_path, classes, conf_thresh, use_gpu=use_gpu, show_conf=show_conf)
 
 
 def camera_detect(model_path: str, classes: List[str], camera_src=0, conf_thresh=0.6, nms_thresh=0.45, use_gpu=True):

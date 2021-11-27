@@ -282,7 +282,7 @@ class ConvertColor(Transformer):
 class RandomContrast(Transformer):
     """ 随机调整对比度 """
 
-    def __init__(self, lower=0.8, upper=1.1):
+    def __init__(self, lower=0.5, upper=1.5):
         """
         Parameters
         ----------
@@ -470,20 +470,12 @@ class Resize(Transformer):
 class RandomFlip(Transformer):
     """ 随机翻转 """
 
-    def __init__(self):
-        super().__init__()
-        self.direction = [None, 'H', 'V']   # 翻转方向
-
     def transform(self, image: ndarray, bbox: ndarray, label: ndarray):
         h, w, c = image.shape
-        direction = randchoice(self.direction)
 
-        if direction == 'H':
+        if random.randint(2):
             image = np.fliplr(image)
             bbox[:, 0::2] = w-bbox[:, 2::-2]
-        elif direction == 'V':
-            image = np.flipud(image)
-            bbox[:, 1::2] = h-bbox[:, 3::-2]
 
         return image, bbox, label
 

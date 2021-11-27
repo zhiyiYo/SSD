@@ -1,6 +1,7 @@
 # coding:utf-8
 import os
 import json
+from pathlib import Path
 
 
 class LossLogger:
@@ -21,7 +22,7 @@ class LossLogger:
         """
         self.frequency = frequency
         self.log_file = log_file
-        self.save_dir = save_dir
+        self.save_dir = Path(save_dir)
         self.loss = 0
         self.loc_loss = 0
         self.conf_loss = 0
@@ -76,7 +77,7 @@ class LossLogger:
         file_name: str
             文件名，不包含 `.json` 后缀
         """
-        os.makedirs(self.save_dir, exist_ok=True)
+        self.save_dir.mkdir(exist_ok=True, parents=True)
         with open(os.path.join(self.save_dir, file_name+'.json'), 'w', encoding='utf-8') as f:
             data = {
                 "losses": self.losses,

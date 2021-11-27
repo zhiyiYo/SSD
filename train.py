@@ -10,8 +10,13 @@ dataset = VOCDataset(root, 'trainval', SSDAugmentation(), True)
 train_pipeline = TrainPipeline(
     dataset,
     vgg_path='model/vgg16_reducedfc.pth',
-    batch_size=16,
-    n_classes=21
+    batch_size=32,
+    num_workers=0,
+    n_classes=21,
+    lr=5e-4,
+    lr_steps=(80000, 100000, 120000),
+    max_iter=120000,
+    save_frequency=5000
 )
 
 train_pipeline.train()
