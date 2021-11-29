@@ -18,7 +18,7 @@ class EvalPipeline:
     """ 测试模型流水线 """
 
     def __init__(self, model_path: str, dataset: VOCDataset, image_size=300, mean=(123, 117, 104), top_k=200,
-                 conf_thresh=0.05, overlap_thresh=0.5, cache=True, save_dir='eval', use_07_metric=False,
+                 conf_thresh=0.05, overlap_thresh=0.5, cache=False, save_dir='eval', use_07_metric=False,
                  use_gpu=True):
         """
         Parameters
@@ -79,11 +79,11 @@ class EvalPipeline:
         self.model.eval()
 
     @torch.no_grad()
-    def eval(self):
+    def eval(self) -> float:
         """ 测试模型，获取 mAP """
         self._predict()
         self._get_ground_truth()
-        self._get_mAP()
+        return self._get_mAP()
 
     def _predict(self):
         """ 预测每一种类存在于哪些图片中 """
@@ -189,12 +189,15 @@ class EvalPipeline:
 
         mAP /= len(self.dataset.classes)
         print(f'mAP of {self.model_path}: {mAP:.2%}')
+        result['mAP'] = mAP
 
         # 保存评估结果
         self.save_dir.mkdir(exist_ok=True)
         p = self.save_dir / (self.model_path.stem + '_AP.json')
         with open(p, 'w', encoding='utf-8') as f:
             json.dump(result, f)
+
+        return mAP
 
     def _get_AP(self, c: str):
         """ 计算一个类的 AP

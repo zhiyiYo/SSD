@@ -15,7 +15,7 @@ if __name__ == '__main__':
         batch_size=8,
         num_workers=4,
         n_classes=21,
-        lr=2.5e-4,
+        lr=5e-4,
         lr_steps=(80000, 100000, 120000),
         max_iter=120000,
         save_frequency=5000,

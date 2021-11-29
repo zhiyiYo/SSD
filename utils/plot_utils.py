@@ -7,26 +7,30 @@ import matplotlib.pyplot as plt
 from .log_utils import LossLogger
 
 
-def plot_loss(log_file: str):
+def plot_loss(log_file: str, epoch_size: int = None):
     """ 绘制损失曲线
 
     Parameters
     ----------
     log_file: str
-        损失日志文件路径
+        损失日志文件路径3
+
+    epoch_size: int
+        每一个 epoch 需要迭代多少次，如果为 `None`，横坐标将是 epoch 而不是 iterations
     """
     logger = LossLogger(None, log_file)
-    iteration = np.arange(0, len(logger.losses))+1
+    epoch_size = 1 if not epoch_size else epoch_size
+    iteration = np.arange(1, len(logger.losses)+1)*epoch_size
+    xlabel = 'epoch' if epoch_size == 1 else 'iterations'
 
-    fig, axes = plt.subplots(1, 3, num='损失曲线', tight_layout=True)
-    titles = ['Total Loss', 'Confidence Loss', 'Location Loss']
-    losses = [logger.losses, logger.conf_losses, logger.loc_losses]
+    fig, ax = plt.subplots(1, 1, num='损失曲线')
+    ax.plot(iteration, logger.losses, label='Total Loss')
+    ax.plot(iteration, logger.conf_losses, label='Confidence Loss')
+    ax.plot(iteration, logger.loc_losses, label='Location Loss')
+    ax.set(xlabel=xlabel, ylabel='loss', title='Loss Curve')
+    ax.legend()
 
-    for ax, title, loss in zip(axes, titles, losses):
-        ax.plot(iteration, loss)
-        ax.set(xlabel='epoch', title=title)
-
-    return fig, axes
+    return fig, ax
 
 
 def plot_PR(file_path: str, class_name: str):
@@ -62,6 +66,6 @@ def plot_AP(file_path: str):
 
     fig, ax = plt.subplots(1, 1, num='AP 柱状图')
     ax.barh(range(len(AP)), AP, height=0.6, tick_label=classes)
-    ax.set(xlabel='AP')
+    ax.set(xlabel='AP', title=f'mAP: {result["mAP"]}')
 
     return fig, ax
