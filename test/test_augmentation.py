@@ -3,7 +3,6 @@ import unittest
 import torch
 
 from net.dataset import VOCDataset
-from torchvision import transforms as T
 
 from utils.augmentation_utils import *
 from utils.box_utils import draw
@@ -20,7 +19,7 @@ class TestAugmentation(unittest.TestCase):
     def test_random_flip(self):
         """ 测试随机翻转 """
         self.dataset.transformer = Compose(
-            [BBoxToAbsoluteCoords(), RandomFlip()])
+            [BBoxToAbsoluteCoords(), RandomMirror()])
         image, target = self.dataset[4]
         self.draw(image, target)
 
@@ -33,7 +32,7 @@ class TestAugmentation(unittest.TestCase):
 
     def test_resize(self):
         self.dataset.transformer = Compose(
-            [Resize((500, 500)), BBoxToAbsoluteCoords()])
+            [Resize(500), BBoxToAbsoluteCoords()])
         image, target = self.dataset[6]
         self.draw(image, target)
 

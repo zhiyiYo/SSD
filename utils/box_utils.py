@@ -1,13 +1,13 @@
 # coding: utf-8
 from typing import Union
-import cmapy
 
+import cmapy
 import numpy as np
 import torch
 from numpy import ndarray
-from torch import Tensor
-
 from PIL import Image, ImageDraw, ImageFont
+from torch import Tensor
+from torch.nn import functional as F
 
 
 def log_sum_exp(x: Tensor):
@@ -44,9 +44,9 @@ def jaccard_overlap(prior: Tensor, bbox: Tensor):
     # 将先验框和边界框真值的 xmax、ymax 以及 xmin、ymin进行广播使得维度一致，(A, B, 2)
     # 再计算 xmax 和 ymin 较小者、xmin 和 ymin 较大者，W=xmax较小-xmin较大，H=ymax较小-ymin较大
     xy_max = torch.min(prior[:, 2:].unsqueeze(1).expand(A, B, 2),
-                       bbox[:, 2:].broadcast_to(A, B, 2))
+                       bbox[:, 2:].unsqueeze(0).expand(A, B, 2))
     xy_min = torch.max(prior[:, :2].unsqueeze(1).expand(A, B, 2),
-                       bbox[:, :2].broadcast_to(A, B, 2))
+                       bbox[:, :2].unsqueeze(0).expand(A, B, 2))
 
     # 计算交集面积
     inter = (xy_max-xy_min).clamp(min=0)
@@ -56,7 +56,7 @@ def jaccard_overlap(prior: Tensor, bbox: Tensor):
     area_prior = ((prior[:, 2]-prior[:, 0]) *
                   (prior[:, 3]-prior[:, 1])).unsqueeze(1).expand(A, B)
     area_bbox = ((bbox[:, 2]-bbox[:, 0]) *
-                 (bbox[:, 3]-bbox[:, 1])).broadcast_to(A, B)
+                 (bbox[:, 3]-bbox[:, 1])).unsqueeze(0).expand(A, B)
 
     return inter/(area_prior+area_bbox-inter)
 
@@ -203,20 +203,52 @@ def match(overlap_thresh: float, prior: Tensor, bbox: Tensor, variance: tuple, l
 
     # 边界框匹配到的先验框不能再和别的边界框匹配，即使 iou 小于阈值也必须匹配，所以填充一个大于1的值
     best_bbox_iou.index_fill_(0, best_prior_index, 2)
-    for i in range(len(best_prior_index)):
-        best_bbox_index[best_prior_index[i]] = i
+    for i, prior_index in enumerate(best_prior_index):
+        best_bbox_index[prior_index] = i
 
     # 挑选出和先验框匹配的边界框，形状为 (n_priors, 4)
     matched_bbox = bbox[best_bbox_index]
 
     # 标记先验框中的物体所属的类，形状为 (n_priors, )，+1 是为了让出背景类的位置
-    conf = label[best_bbox_index]+1
+    conf = label[best_bbox_index] + 1
     conf[best_bbox_iou < overlap_thresh] = 0
 
     # 对先验框的位置进行编码
     loc = encode(prior, matched_bbox, variance)
 
     return loc, conf
+
+
+@torch.no_grad()
+def hard_negative_mining(conf_pred: Tensor, conf_t: Tensor, neg_pos_ratio: int):
+    """ 困难样本挖掘
+
+    Parameters
+    ----------
+    conf_pred: Tensor of shape `(N, n_priors, n_classes)`
+        神经网络预测的类别置信度
+
+    conf_t: Tensor of shape `(N, n_priors)`
+        类别标签
+
+    neg_pos_ratio: int
+        负样本和正样本个数比
+    """
+    # 计算负样本损失，shape: (N, n_priors)
+    loss = -F.log_softmax(conf_pred, dim=2)[:, :, 0]
+
+    # 计算每一个 batch 的正样本和负样本个数
+    pos_mask = conf_t > 0
+    n_pos = pos_mask.long().sum(dim=1, keepdim=True)
+    n_neg = n_pos*neg_pos_ratio
+
+    # 选取出损失最高的负样本
+    loss[pos_mask] = 0
+    _, indexes = loss.sort(dim=1, descending=True)
+    _, rank = indexes.sort(dim=1)
+    neg_mask = rank < n_neg
+
+    return pos_mask | neg_mask
 
 
 def nms(boxes: Tensor, scores: Tensor, overlap_thresh=0.5, top_k=200):
@@ -366,7 +398,7 @@ def rescale_bbox(bbox: ndarray, image_size: int, h: int, w: int):
         预测框，坐标形式为 `(cx, cy, w, h)`
     """
     bbox *= image_size
-    
+
     # 图像填充区域大小
     pad_x = max(h-w, 0)*image_size/max(h, w)
     pad_y = max(w-h, 0)*image_size/max(h, w)

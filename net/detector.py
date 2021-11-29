@@ -2,8 +2,7 @@
 import torch
 from torch import Tensor
 
-from utils.box_utils import decode
-from torchvision.ops import nms
+from utils.box_utils import decode, nms
 
 
 class Detector:
@@ -76,7 +75,7 @@ class Detector:
                 boxes = bbox[mask]
 
                 # 非极大值抑制，将多余的框滤除
-                indexes = nms(boxes, scores, self.nms_thresh)
+                indexes = nms(boxes, scores, self.nms_thresh, self.top_k)
                 out[i, c, :len(indexes)] = torch.cat(
                     (boxes[indexes], scores[indexes].unsqueeze(1)), dim=1)
 

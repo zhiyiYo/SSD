@@ -17,8 +17,8 @@ from .ssd import SSD
 class EvalPipeline:
     """ 测试模型流水线 """
 
-    def __init__(self, model_path: str, dataset: VOCDataset, image_size=300, mean=(123, 117, 104),
-                 top_k=200, conf_thresh=0.05, overlap_thresh=0.5, save_dir='eval', use_07_metric=False,
+    def __init__(self, model_path: str, dataset: VOCDataset, image_size=300, mean=(123, 117, 104), top_k=200,
+                 conf_thresh=0.05, overlap_thresh=0.5, cache=True, save_dir='eval', use_07_metric=False,
                  use_gpu=True):
         """
         Parameters
@@ -35,11 +35,17 @@ class EvalPipeline:
         mean: tuple
             图像中心化时所减去的值
 
+        top_k: int
+            一张图片中每一个类别最多保留的预测框数量
+
         conf_thresh: float
             置信度阈值
 
         overlap_thresh: float
             IOU 阈值
+
+        cache: bool
+            是否保存预测数据
 
         save_dir: str
             测试结果和预测结果文件的保存目录
@@ -50,7 +56,6 @@ class EvalPipeline:
         use_gpu: bool
             是否使用 GPU
         """
-        self.mean = mean
         self.top_k = top_k
         self.use_gpu = use_gpu
         self.dataset = dataset
@@ -58,6 +63,8 @@ class EvalPipeline:
         self.conf_thresh = conf_thresh
         self.overlap_thresh = overlap_thresh
         self.use_07_metric = use_07_metric
+        self.mean = mean
+        self.cache = cache
         self.save_dir = Path(save_dir)
 
         self.model_path = Path(model_path)
@@ -82,17 +89,16 @@ class EvalPipeline:
         """ 预测每一种类存在于哪些图片中 """
         suffix = f'_topk{self.top_k}_conf{self.conf_thresh}_iou{self.overlap_thresh}_pred.json'
         p = self.save_dir/(self.model_path.stem + suffix)
-        if p.exists():
+        if p.exists() and self.cache:
             print(f'🛸 从 {p} 中取得预测数据')
             with open(p, encoding='utf-8') as f:
                 self.preds = json.load(f)
                 return
 
         self.preds = {c: {} for c in self.dataset.classes}
-        transformer = ToTensor(self.image_size)
+        transformer = ToTensor(self.image_size, self.mean)
 
         print('🛸 正在预测中...')
-        size = self.image_size
         for i, (image_path, image_name) in enumerate(zip(self.dataset.image_paths, self.dataset.image_names)):
             print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
 
@@ -124,9 +130,10 @@ class EvalPipeline:
                 }
 
         # 保存预测数据
-        self.save_dir.mkdir(exist_ok=True)
-        with open(p, 'w', encoding='utf-8') as f:
-            json.dump(self.preds, f)
+        if self.cache:
+            self.save_dir.mkdir(exist_ok=True)
+            with open(p, 'w', encoding='utf-8') as f:
+                json.dump(self.preds, f)
 
     def _get_ground_truth(self):
         """ 获取 ground truth 中每一种类存在于哪些图片中 """

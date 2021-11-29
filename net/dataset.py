@@ -7,9 +7,9 @@ from xml.etree import ElementTree as ET
 import cv2 as cv
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, RandomSampler, BatchSampler
 
-from utils.augmentation_utils import SSDAugmentation, Transformer
+from utils.augmentation_utils import Transformer
 
 
 class AnnotationTransformer:
@@ -67,6 +67,11 @@ class AnnotationTransformer:
                 pt = int(bbox.find(pt).text) - 1
                 pt = pt/w if i % 2 == 0 else pt/h
                 data.append(pt)
+
+            # 检查数据是否合法
+            if data[0] > data[2] or data[1] > data[3]:
+                p = [int(bbox.find(pt).text) for pt in points]
+                raise ValueError(f"{file_path} 存在脏数据：object={name}, bbox={p}")
 
             data.append(self.class_to_index[name])
             target.append(data)
@@ -168,7 +173,7 @@ class VOCDataset(Dataset):
             image, bbox, label = self.transformer.transform(image, bbox, label)
             target = np.hstack((bbox, label[:, np.newaxis]))
 
-        return torch.from_numpy(image).permute(2, 0, 1), target
+        return torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1), target
 
 
 def collate_fn(batch: List[Tuple[torch.Tensor, np.ndarray]]):
@@ -196,4 +201,44 @@ def collate_fn(batch: List[Tuple[torch.Tensor, np.ndarray]]):
         images.append(img.to(torch.float32))
         targets.append(torch.Tensor(target))
 
-    return torch.stack(images, 0), targets
+    return torch.stack(images), targets
+
+
+class IterationBatchSampler:
+    """ 可指定迭代次数的采样器 """
+
+    def __init__(self, dataset: Dataset, batch_size: int, drop_last: bool, max_iters: int, start_iter: int = 0):
+        """
+        Parameters
+        ----------
+        dataset: Dataset
+            数据集
+
+        batch_size: int
+            批大小
+
+        drop_last: bool
+            如果最后一个 batch 的长度小于 `batch_size`, 是否将其舍弃
+
+        max_iters: int
+            迭代次数
+
+        start_iter: int
+            起始迭代次数
+        """
+        self.max_iters = max_iters
+        self.start_iter = start_iter
+        self.sampler = RandomSampler(dataset)
+        self.batch_sampler = BatchSampler(self.sampler, batch_size, drop_last)
+
+    def __len__(self):
+        return self.max_iters
+
+    def __iter__(self):
+        i = self.start_iter
+        while i <= self.max_iters:
+            for batch in self.batch_sampler:
+                i += 1
+                if i > self.max_iters:
+                    break
+                yield batch

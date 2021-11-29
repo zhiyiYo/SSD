@@ -14,8 +14,10 @@ from torch.nn import init
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from utils.log_utils import LossLogger
+from utils.datetime_utils import time_delta
+from utils.lr_schedule_utils import WarmUpMultiStepLR
 
-from .dataset import collate_fn
+from .dataset import collate_fn, IterationBatchSampler
 from .loss import SSDLoss
 from .ssd import SSD
 
@@ -40,8 +42,9 @@ class TrainPipeline:
 
     def __init__(self, dataset: Dataset, vgg_path: str = None, ssd_path: str = None,
                  lr=0.001, momentum=0.9, weight_decay=5e-4, lr_steps=(40000, 50000, 60000),
-                 batch_size=16, num_workers=0, start_iter=0, max_iter=60000, save_frequency=2000,
-                 use_gpu=True, save_dir='model', log_file: str = None, log_dir='log', **config):
+                 batch_size=16, num_workers=4, start_iter=0, max_iter=60000, warm_up_factor=1/3,
+                 warm_up_iters=500, save_frequency=2000, use_gpu=True, save_dir='model', log_file: str = None,
+                 log_dir='log', **config):
         """
         Parameters
         ----------
@@ -72,13 +75,19 @@ class TrainPipeline:
             训练集 batch 大小
 
         num_workers: int
-            加载数据的线程数，Windows 系统必须为 0
+            加载数据的线程数
 
         start_iter: int
             SSD 模型文件包含的参数是训练了多少次的结果
 
         max_iter: int
             最多迭代多少次
+
+        warm_up_factor: float
+            热启动因子
+
+        warm_up_iters: int
+            迭代多少次才结束热启动
 
         save_frequency: int
             迭代多少次保存一次模型
@@ -151,11 +160,9 @@ class TrainPipeline:
         # 损失函数和优化器
         self.critorion = SSDLoss(**self.config)
         self.optimizer = optim.SGD(
-            [{"params": self.model.parameters(), 'initial_lr': lr}],
-            lr, momentum, weight_decay=weight_decay
-        )
-        self.lr_schedule = optim.lr_scheduler.MultiStepLR(
-            self.optimizer, lr_steps, 0.1, last_epoch=start_iter)
+            self.model.parameters(), lr, momentum, weight_decay=weight_decay)
+        self.lr_schedule = WarmUpMultiStepLR(
+            self.optimizer, lr_steps, 0.1, warm_up_factor, warm_up_iters)
 
         # 训练损失记录器
         self.logger = LossLogger(self.n_batches, log_file, log_dir)
@@ -203,17 +210,15 @@ class TrainPipeline:
         self.save_dir = self.save_dir/t
         self.logger.save_dir = self.logger.save_dir/t
 
+        batch_sampler = IterationBatchSampler(
+            self.dataset, self.batch_size, True, self.max_iter, self.start_iter)
         data_loader = DataLoader(
             self.dataset,
-            self.batch_size,
-            shuffle=True,
+            batch_sampler=batch_sampler,
             collate_fn=collate_fn,
             num_workers=self.num_workers,
             pin_memory=True,
-            drop_last=True
         )
-        # 无穷迭代器
-        data_iter = itertools.cycle(data_loader)
 
         bar_format = '{desc}{n_fmt:>4s}/{total_fmt:<4s}|{bar}|{postfix}'
         print('🚀 开始训练！')
@@ -222,7 +227,7 @@ class TrainPipeline:
             self.model.train()
             start_time = datetime.now()
 
-            for i in range(self.start_iter, self.max_iter):
+            for i, (images, targets) in enumerate(data_loader, self.start_iter):
                 self.current_iter = i
                 if i > self.start_iter and (i-self.start_iter) % self.n_batches == 0:
                     start_time = datetime.now()
@@ -231,9 +236,6 @@ class TrainPipeline:
 
                 e = math.floor((i-self.start_iter)/self.n_batches) + 1
                 bar.set_description(f"\33[36m🌌 Epoch {e:5d}")
-
-                # 取出数据
-                images, targets = next(data_iter)
 
                 # 预测边界框、置信度和先验框
                 pred = self.model(images.to(self.device))
@@ -246,7 +248,7 @@ class TrainPipeline:
                 self.optimizer.step()
                 self.lr_schedule.step()
 
-                cost_time = datetime.now() - start_time
+                cost_time = time_delta(start_time)
                 bar.set_postfix_str(
                     f'loss: {loss.item():.3f}, loc_loss: {loc_loss.item():.3f}, conf_loss: {conf_loss.item():.3f}, 执行时间: {cost_time}\33[0m')
                 bar.update()
@@ -257,5 +259,6 @@ class TrainPipeline:
                 # 定期保存模型
                 if i > self.start_iter and (i+1-self.start_iter) % self.save_frequency == 0:
                     self.save()
+                    self.model.train()
 
         self.save()

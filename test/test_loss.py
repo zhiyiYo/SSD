@@ -2,7 +2,8 @@
 import unittest
 
 import torch
-from net import SSDLoss, SSD
+from net import SSDLoss, SSD, VOCDataset
+from utils.augmentation_utils import Resize
 
 
 class TestLoss(unittest.TestCase):
@@ -11,15 +12,17 @@ class TestLoss(unittest.TestCase):
     def test_loss(self):
         # 模型
         model = SSD(21).cuda()
-        x = torch.rand((2, 3, 300, 300)).cuda()
+        model.load('model/SSD.pth')
+
+        root = 'data/VOCtrainval_06-Nov-2007/VOCdevkit/VOC2007'
+        dataset = VOCDataset(root, 'trainval', Resize())
+
+        image, target = dataset[0]
+        image = image.unsqueeze(0).cuda()
+        target = [torch.Tensor(target)]
 
         # 预测值
-        loc_pred, conf_pred, priors = model(x)
-
-        # 标签
-        bbox = torch.randn(2, 10, 4).abs()
-        conf = torch.randint(20, (2, 10, 1))
-        target = torch.cat((bbox, conf.float()), dim=2)
+        loc_pred, conf_pred, priors = model(image)
 
         # 损失函数
         loss = SSDLoss(21)
