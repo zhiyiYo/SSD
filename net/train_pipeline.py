@@ -42,7 +42,7 @@ class TrainPipeline:
 
     def __init__(self, dataset: Dataset, vgg_path: str = None, ssd_path: str = None,
                  lr=0.001, momentum=0.9, weight_decay=5e-4, lr_steps=(40000, 50000, 60000),
-                 batch_size=16, num_workers=4, start_iter=0, max_iter=60000, warm_up_factor=1/3,
+                 batch_size=16, num_workers=4, start_iter=0, max_iters=60000, warm_up_factor=1/3,
                  warm_up_iters=500, save_frequency=2000, use_gpu=True, save_dir='model', log_file: str = None,
                  log_dir='log', **config):
         """
@@ -80,7 +80,7 @@ class TrainPipeline:
         start_iter: int
             SSD 模型文件包含的参数是训练了多少次的结果
 
-        max_iter: int
+        max_iters: int
             最多迭代多少次
 
         warm_up_factor: float
@@ -155,7 +155,7 @@ class TrainPipeline:
         # 迭代次数
         self.current_iter = start_iter
         self.start_iter = start_iter
-        self.max_iter = max_iter
+        self.max_iters = max_iters
 
         # 损失函数和优化器
         self.critorion = SSDLoss(**self.config)
@@ -211,7 +211,7 @@ class TrainPipeline:
         self.logger.save_dir = self.logger.save_dir/t
 
         batch_sampler = IterationBatchSampler(
-            self.dataset, self.batch_size, True, self.max_iter, self.start_iter)
+            self.dataset, self.batch_size, True, self.max_iters, self.start_iter)
         data_loader = DataLoader(
             self.dataset,
             batch_sampler=batch_sampler,

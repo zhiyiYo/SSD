@@ -61,11 +61,12 @@ def plot_AP(file_path: str):
     AP = []
     classes = []
     for k, v in result.items():
-        AP.append(v['AP'])
-        classes.append(k)
+        if k!='mAP':
+            AP.append(v['AP'])
+            classes.append(k)
 
     fig, ax = plt.subplots(1, 1, num='AP 柱状图')
     ax.barh(range(len(AP)), AP, height=0.6, tick_label=classes)
-    ax.set(xlabel='AP', title=f'mAP: {result["mAP"]}')
+    ax.set(xlabel='AP', title=f'mAP: {result["mAP"]:.2%}')
 
     return fig, ax

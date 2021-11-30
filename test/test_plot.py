@@ -24,5 +24,5 @@ class TestPlotUtils(unittest.TestCase):
 
     def test_plot_AP(self):
         """ 测试 AP 柱状图绘制 """
-        fig, ax = plot_AP('eval/SSD_AP.json')
+        fig, ax = plot_AP('eval/SSD_120000_AP.json')
         plt.show()
