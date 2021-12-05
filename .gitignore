@@ -30,3 +30,5 @@ VOCtrainval_06-Nov-2007
 
 # 忽略评估结果
 eval/
+
+data/

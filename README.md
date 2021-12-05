@@ -118,7 +118,7 @@ When `lr` is 5e-4, `batch_ size` is 8 and train on VOC2007 + VOC2012, the traini
         │   └───Main
         └───JPEGImages
         ```
-   2. Put your `test.txt` and `train.txt` in the `Main` folder. These txt files must contain the names of the corresponding **JPG** format pictures. These names do not need a suffix.
+   2. Put your `test.txt` and `train.txt` in the `Main` folder. These txt files must contain the names of the corresponding **jpg** format pictures. These names do not need a suffix.
    3. Modify the `classes` property of `VOCDataset` in `net/dataset.py` to include all the classes in your dataset.
    4. Change the `root` and `image_set` of `VOCDataset` in `train.py` and start training.
 
