@@ -355,8 +355,8 @@ def draw(image: Union[ndarray, Image.Image], bbox: ndarray, label: ndarray, conf
         image_draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
 
         # 绘制标签
-        y1_ = y1 if y1-23 < 0 else y1-23
-        y2_ = y1 if y1_ < y1 else y1+23
+        y1_ = y2 if y1-23 < 0 else y1-23
+        y2_ = y1 if y1_ < y1 else y2+23
         text = label[i] if conf is None else f'{label[i]} | {conf[i]:.2f}'
         l = font.getlength(text) + 3
         right = x1+l if x1+l <= image.width-1 else image.width-1

@@ -69,7 +69,7 @@ class AnnotationTransformer:
                 data.append(pt)
 
             # 检查数据是否合法
-            if data[0] > data[2] or data[1] > data[3]:
+            if data[0] >= data[2] or data[1] >= data[3]:
                 p = [int(bbox.find(pt).text) for pt in points]
                 raise ValueError(f"{file_path} 存在脏数据：object={name}, bbox={p}")
 
@@ -242,3 +242,9 @@ class IterationBatchSampler:
                 if i > self.max_iters:
                     break
                 yield batch
+
+
+class CustomDataset(VOCDataset):
+    """ 自定义数据集 """
+
+    classes = ['hotspot']

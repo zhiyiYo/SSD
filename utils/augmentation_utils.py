@@ -405,7 +405,7 @@ class SwapChannels(Transformer):
 
 class ColorJitter(Transformer):
     """ 颜色干扰 """
-    
+
     def __init__(self):
         self.pd = [
             RandomContrast(),  # RGB
