@@ -10,7 +10,7 @@ An minimum implementation of SSD object detection using pytorch.
     pip install -r requirements.txt
     ```
 
-2. Install [pytorch](https://pytorch.org/), refer to the [blog](https://blog.csdn.net/qq_23013309/article/details/103965619) for details.
+2. Install [pytorch](https://pytorch.org/), refer to the [blog](https://www.cnblogs.com/zhiyiYo/p/15865454.html) for details.
 
 
 ## Train
